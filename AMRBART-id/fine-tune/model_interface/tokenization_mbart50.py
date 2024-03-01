@@ -181,6 +181,8 @@ class MBart50Tokenizer(PreTrainedTokenizer):
         self.tgt_lang = tgt_lang
         self.set_src_lang_special_tokens(self._src_lang)
 
+        self.sp_unk_token_id = self.sp_model.PieceToId("<unk>")
+
     @property
     def vocab_size(self) -> int:
         return len(self.sp_model) + len(self.lang_code_to_id) + self.fairseq_offset + 1  # Plus 1 for the mask token
@@ -222,6 +224,9 @@ class MBart50Tokenizer(PreTrainedTokenizer):
         if token in self.fairseq_tokens_to_ids:
             return self.fairseq_tokens_to_ids[token]
         spm_id = self.sp_model.PieceToId(token)
+
+        if spm_id == self.sp_unk_token_id:
+            return self.fairseq_tokens_to_ids["<unk>"]
 
         # Need to return unknown token if the SP model returned 0
         return spm_id + self.fairseq_offset if spm_id else self.unk_token_id

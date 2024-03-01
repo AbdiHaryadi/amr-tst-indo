@@ -212,7 +212,7 @@ def main():
         if data_args.overwrite_cache or not os.path.exists(data_args.data_cache_dir + "/train"):
             with training_args.main_process_first(desc="train dataset map pre-processing"):
                 train_dataset = train_dataset.map(
-                    raw_datasets.create_tokenize_function("train"),
+                    raw_datasets.tokenize_function,
                     batched=True,
                     num_proc=data_args.preprocessing_num_workers,
                     remove_columns=column_names,
@@ -235,7 +235,7 @@ def main():
         if data_args.overwrite_cache or not os.path.exists(data_args.data_cache_dir + "/valid"):
             with training_args.main_process_first(desc="validation dataset map pre-processing"):
                 eval_dataset = eval_dataset.map(
-                    raw_datasets.create_tokenize_function("valid"),
+                    raw_datasets.tokenize_function,
                     batched=True,
                     num_proc=data_args.preprocessing_num_workers,
                     remove_columns=column_names,
@@ -258,7 +258,7 @@ def main():
         if data_args.overwrite_cache or not os.path.exists(data_args.data_cache_dir + "/test"):
             with training_args.main_process_first(desc="prediction dataset map pre-processing"):
                 predict_dataset = predict_dataset.map(
-                    raw_datasets.create_tokenize_function("test"),
+                    raw_datasets.tokenize_function,
                     batched=True,
                     num_proc=data_args.preprocessing_num_workers,
                     remove_columns=column_names,
@@ -269,9 +269,6 @@ def main():
                 predict_dataset.save_to_disk(data_args.data_cache_dir + "/test")
         else:
             predict_dataset = load_from_disk(data_args.data_cache_dir + "/test", keep_in_memory=True)
-
-    with open(os.path.join(training_args.output_dir, "trim_counts.json"), "w") as f:
-        json.dump(raw_datasets.trim_counts, f)
 
     # label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     label_pad_token_id = tokenizer.pad_token_id

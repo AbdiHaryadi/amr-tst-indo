@@ -8,6 +8,7 @@ ValPath=$RootDir/ds/$3
 Model=$1
 ModelCache=$RootDir/.cache
 DataCache=$DataPath/.cache/dump-amrparsing
+Epoch=$4
 
 OutputDir=${RootDir}/outputs/$Model-fted
 
@@ -44,8 +45,8 @@ python -u main.py \
     --optim "adamw_hf" \
     --lr_scheduler_type "polynomial" \
     --warmup_steps 200 \
-    --num_train_epochs 16 \
-    --early_stopping 16 \
+    --num_train_epochs $Epoch \
+    --early_stopping $Epoch \
     --max_source_length 400 \
     --max_target_length 1024 \
     --val_max_target_length 1024 \

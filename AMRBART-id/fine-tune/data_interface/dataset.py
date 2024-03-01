@@ -69,44 +69,27 @@ class AMRParsingDataSet(Dataset):
         print("datasets:", self.datasets)
         print("colums:", column_names)
 
-        self.trim_counts = {
-            "train": {"token_count": 0, "data_count": 0},
-            "valid": {"token_count": 0, "data_count": 0},
-            "test": {"token_count": 0, "data_count": 0},
+    def tokenize_function(self, examples):
+        amr = examples["src"]  # AMR tokens
+        txt = examples["tgt"]  # Text tokens
+        # del examples["lang"]
+
+        txt = [inp.lower() for inp in txt]
+
+        amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
+
+        raw_txt_ids = self.tokenizer(
+            txt, max_length=self.max_src_length, padding=False, truncation=True
+        )["input_ids"]
+        if self.unified_input:
+            txt_ids = [itm[:self.max_src_length-3] + [self.tokenizer.amr_bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.amr_eos_token_id] for itm in raw_txt_ids]
+        else:
+            txt_ids = raw_txt_ids
+
+        return {
+            "input_ids": txt_ids,
+            "labels": amr_ids
         }
-
-    def create_tokenize_function(self, dataset_type):
-        trim_counts = self.trim_counts[dataset_type]
-        def tokenize_function(examples):
-            amr = examples["src"]  # AMR tokens
-            txt = examples["tgt"]  # Text tokens
-            langs = examples["lang"]
-            del examples["lang"]
-            lang_mapper = {
-                'en': "en_XX",
-                'id': "id_ID",
-            }
-            txt = [lang_mapper[langs[i]] + inp for i, inp in enumerate(txt)]
-
-            amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
-            
-            raw_txt_ids = self.tokenizer(
-                txt, max_length=self.max_src_length, padding=False, truncation=True
-            )["input_ids"]
-            if self.unified_input:
-                for itm in raw_txt_ids:
-                    if len(itm) > self.max_src_length-3:
-                        trim_counts["token_count"] += len(itm) - (self.max_src_length-3)
-                        trim_counts["data_count"] += 1
-                txt_ids = [itm[:self.max_src_length-3] + [self.tokenizer.amr_bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.amr_eos_token_id] for itm in raw_txt_ids]
-            else:
-                txt_ids = raw_txt_ids
-            return {
-                "input_ids": txt_ids,
-                "labels": amr_ids
-            }
-        
-        return tokenize_function
 
 
 @dataclass
