@@ -219,15 +219,15 @@ def amr_iter(path: str):
                         current_amr = line
                         status = "select_amr_until_blank_line"
                     else:
-                        yield "", False
+                        yield "", "AMR is empty"
                         status = "find_end_of_header"
                     
                 case "select_amr_until_blank_line":
                     if line == "":
                         try:
-                            yield to_amr_with_pointer(current_amr), True
-                        except ValueError:
-                            yield current_amr, False
+                            yield to_amr_with_pointer(current_amr), ""
+                        except ValueError as e:
+                            yield current_amr, str(e)
                     
                         status = "find_non_empty_line"
                         current_amr = ""
@@ -240,9 +240,9 @@ def amr_iter(path: str):
             
         if status == "select_amr_until_blank_line":
             try:
-                yield to_amr_with_pointer(current_amr), True
-            except ValueError:
-                yield current_amr, False
+                yield to_amr_with_pointer(current_amr), ""
+            except ValueError as e:
+                yield current_amr, str(e)
 
 def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
     df = pd.read_csv(path, sep=sep, header=0)
@@ -253,20 +253,20 @@ def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
 def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str):
     error_count = 0
     with open(output_path, mode="w") as fp_out:
-        for sent, (amr, is_amr_valid) in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
-            if is_amr_valid:
+        for sent, (amr, error_message) in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
+            if error_message == "":
                 print(
                     json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
                     file=fp_out
                 )
             else:
-                print("(Warning) Error at this input:")
+                print(f"(Warning) {error_message}")
                 print(f"Sentence: {sent}")
                 print(f"AMR:")
                 print(amr)
                 print("---")
                 error_count += 1
-                
+
     print(f"{error_count=}")
 
 if len(sys.argv) < 2:
