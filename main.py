@@ -205,7 +205,10 @@ def sentence_amr_iter(path: str):
                         assert line.startswith(ID_PREFIX), f"Unexpected line for ID: \"{line}\""
                         status = "expect_sentence"
                     case "expect_sentence":
-                        assert line.startswith(SENTENCE_PREFIX)
+                        if line == "":
+                            continue
+
+                        assert line.startswith(SENTENCE_PREFIX), f"Unexpected line for sentence: \"{line}\""
                         current_sentence = line[sentence_prefix_offset:]
                         status = "select_amr_until_blank_line"
                     case "select_amr_until_blank_line":
