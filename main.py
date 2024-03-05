@@ -186,40 +186,50 @@ def is_node_name(current_token):
     return node_name_matcher.match(current_token) is not None
 
 def amr_iter(path: str):
-    ID_PREFIX = "# ::id "
-    SENTENCE_PREFIX = "# ::snt "
-
-    error_amr_list = []
-
     with open(path) as fp:
-        status = "find_begin_of_amr"
+        status = "find_non_empty_line"
         current_amr = ""
 
         for line in fp:
             line = line.strip()
             match status:
-                case "find_begin_of_amr":
+                case "find_non_empty_line":
+                    if line == "":
+                        continue
+
+                    if line.startswith("("):
+                        current_amr = line
+                        status = "select_amr_until_blank_line"
+                    else:
+                        status = "find_end_of_header"
+
+                case "find_end_of_header":
                     if line.startswith("("):
                         current_amr = line
                         status = "select_amr_until_blank_line"
                     elif line == "":
-                        pass
-                    elif line.startswith(ID_PREFIX):
-                        pass
-                    elif line.startswith(SENTENCE_PREFIX):
-                        pass
+                        status = "find_begin_of_amr"
+                    # else: ignore
+
+                case "find_begin_of_amr":
+                    if line == "":
+                        continue
+                    
+                    if line.startswith("("):
+                        current_amr = line
+                        status = "select_amr_until_blank_line"
                     else:
-                        raise ValueError(f"Unexpected line: {line}")
+                        yield "", False
+                        status = "find_end_of_header"
                     
                 case "select_amr_until_blank_line":
                     if line == "":
-                        assert current_amr != ""
                         try:
-                            yield to_amr_with_pointer(current_amr)
+                            yield to_amr_with_pointer(current_amr), True
                         except ValueError:
-                            error_amr_list.append(current_amr)
+                            yield current_amr, False
                     
-                        status = "find_begin_of_amr"
+                        status = "find_non_empty_line"
                         current_amr = ""
 
                     elif current_amr == "":
@@ -229,15 +239,10 @@ def amr_iter(path: str):
                         current_amr += " " + line
             
         if status == "select_amr_until_blank_line":
-            assert current_amr != ""
             try:
-                yield to_amr_with_pointer(current_amr)
+                yield to_amr_with_pointer(current_amr), True
             except ValueError:
-                error_amr_list.append(current_amr)
-
-    if len(error_amr_list) > 0:
-        error_text = "\n".join(error_amr_list)
-        raise ValueError(f"Exists {len(error_amr_list)} error(s):\n{error_text}")
+                yield current_amr, False
 
 def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
     df = pd.read_csv(path, sep=sep, header=0)
@@ -246,12 +251,23 @@ def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
         yield sent
 
 def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str):
+    error_count = 0
     with open(output_path, mode="w") as fp_out:
-        for sent, amr in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
-            print(
-                json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
-                file=fp_out
-            )
+        for sent, (amr, is_amr_valid) in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
+            if is_amr_valid:
+                print(
+                    json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
+                    file=fp_out
+                )
+            else:
+                print("(Warning) Error at this input:")
+                print(f"Sentence: {sent}")
+                print(f"AMR:")
+                print(amr)
+                print("---")
+                error_count += 1
+                
+    print(f"{error_count=}")
 
 if len(sys.argv) < 2:
     raise ValueError(f"Expected command format: {sys.argv[0]} <action>")
