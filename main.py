@@ -141,7 +141,7 @@ def to_amr_with_pointer(amr: str):
         elif status == "find_end_of_non_literal_value":
             if c in "abcdefghijklmnopqrstuvwxyz-0123456789":
                 current_token += c
-            elif c.isspace():
+            elif c.isspace() or c == ")":
                 if is_node_name(current_token):
                     node_name = current_token
                     if node_name in node_name_to_pointer_map:
@@ -157,7 +157,15 @@ def to_amr_with_pointer(amr: str):
                 else:
                     result += f"{current_token}"
 
-                status = "find_right_or_begin_of_relation"
+                if c != ")":
+                    status = "find_right_or_begin_of_relation"
+                else:
+                    level -= 1
+                    result += " )"
+                    if level == 0:
+                        status = "end"
+                    else:
+                        status = "find_right_or_begin_of_relation"
 
             else:
                 raise ValueError(f"Unexpected char of node name or concept: \"{c}\"")
@@ -223,14 +231,17 @@ def amr_iter(path: str):
                         status = "find_end_of_header"
                     
                 case "select_amr_until_blank_line":
-                    if line == "":
+                    if line == "" or line.startswith("#"):
                         try:
                             yield to_amr_with_pointer(current_amr), ""
                         except ValueError as e:
                             yield current_amr, str(e)
                     
-                        status = "find_non_empty_line"
                         current_amr = ""
+                        if line.startswith("#"):
+                            status = "find_end_of_header"
+                        else:
+                            status = "find_non_empty_line"
 
                     elif current_amr == "":
                         current_amr = line
