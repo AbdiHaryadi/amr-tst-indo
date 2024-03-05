@@ -189,6 +189,8 @@ def amr_iter(path: str):
     ID_PREFIX = "# ::id "
     SENTENCE_PREFIX = "# ::snt "
 
+    error_amr_list = []
+
     with open(path) as fp:
         status = "find_begin_of_amr"
         current_amr = ""
@@ -215,7 +217,7 @@ def amr_iter(path: str):
                         try:
                             yield to_amr_with_pointer(current_amr)
                         except ValueError:
-                            raise ValueError(f"Error when processing:\n{current_amr}")
+                            error_amr_list.append(current_amr)
                     
                         status = "find_begin_of_amr"
                         current_amr = ""
@@ -231,7 +233,11 @@ def amr_iter(path: str):
             try:
                 yield to_amr_with_pointer(current_amr)
             except ValueError:
-                raise ValueError(f"Error when processing:\n{current_amr}")
+                error_amr_list.append(current_amr)
+
+    if len(error_amr_list) > 0:
+        error_text = "\n".join(error_amr_list)
+        raise ValueError(f"Exists {len(error_amr_list)} error(s):\n{error_text}")
 
 def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
     df = pd.read_csv(path, sep=sep, header=0)
@@ -241,7 +247,7 @@ def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
 
 def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str):
     with open(output_path, mode="w") as fp_out:
-        for sent, amr in zip(sent_iter(sent_input_path), amr_iter(amr_input_path)):
+        for sent, amr in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
             print(
                 json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
                 file=fp_out
