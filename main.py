@@ -1,4 +1,5 @@
 import json
+import pandas as pd
 import re
 import sys
 
@@ -184,58 +185,63 @@ def to_amr_with_pointer(amr: str):
 def is_node_name(current_token):
     return node_name_matcher.match(current_token) is not None
 
-def sentence_amr_iter(path: str):
+def amr_iter(path: str):
     ID_PREFIX = "# ::id "
     SENTENCE_PREFIX = "# ::snt "
-    sentence_prefix_offset = len(SENTENCE_PREFIX)
 
     with open(path) as fp:
-        status = "expect_id"
-        current_sentence = ""
+        status = "find_begin_of_amr"
         current_amr = ""
 
-        try:
-            for line in fp:
-                line = line.strip()
-                match status:
-                    case "expect_id":
-                        if line == "":
-                            continue
-
-                        assert line.startswith(ID_PREFIX), f"Unexpected line for ID: \"{line}\""
-                        status = "expect_sentence"
-                    case "expect_sentence":
-                        if line == "":
-                            continue
-
-                        assert line.startswith(SENTENCE_PREFIX), f"Unexpected line for sentence: \"{line}\""
-                        current_sentence = line[sentence_prefix_offset:]
+        for line in fp:
+            line = line.strip()
+            match status:
+                case "find_begin_of_amr":
+                    if line.startswith("("):
+                        current_amr = line
                         status = "select_amr_until_blank_line"
-                    case "select_amr_until_blank_line":
-                        if line == "":
-                            assert current_amr != ""
-                            yield current_sentence, to_amr_with_pointer(current_amr)
-                            status = "expect_id"
+                    elif line == "":
+                        pass
+                    elif line.startswith(ID_PREFIX):
+                        pass
+                    elif line.startswith(SENTENCE_PREFIX):
+                        pass
+                    else:
+                        raise ValueError(f"Unexpected line: {line}")
+                    
+                case "select_amr_until_blank_line":
+                    if line == "":
+                        assert current_amr != ""
+                        try:
+                            yield to_amr_with_pointer(current_amr)
+                        except ValueError:
+                            raise ValueError(f"Error when processing:\n{current_amr}")
+                    
+                        status = "find_begin_of_amr"
+                        current_amr = ""
 
-                            current_sentence = ""
-                            current_amr = ""
+                    elif current_amr == "":
+                        current_amr = line
+                        
+                    else:
+                        current_amr += " " + line
+            
+        if status == "select_amr_until_blank_line":
+            assert current_amr != ""
+            try:
+                yield to_amr_with_pointer(current_amr)
+            except ValueError:
+                raise ValueError(f"Error when processing:\n{current_amr}")
 
-                        elif current_amr == "":
-                            current_amr = line
-                            
-                        else:
-                            current_amr += " " + line
-                
-            if status == "select_amr_until_blank_line":
-                assert current_amr != ""
-                yield current_sentence, to_amr_with_pointer(current_amr)
+def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
+    df = pd.read_csv(path, sep=sep, header=0)
+    for sent in df[sent_attribute].values:
+        sent = sent.strip()
+        yield sent
 
-        except ValueError:
-            raise ValueError(f"Error when processing {current_sentence=}")
-
-def to_jsonl_dataset(input_path: str, output_path: str):
+def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str):
     with open(output_path, mode="w") as fp_out:
-        for sent, amr in sentence_amr_iter(input_path):
+        for sent, amr in zip(sent_iter(sent_input_path), amr_iter(amr_input_path)):
             print(
                 json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
                 file=fp_out
@@ -248,11 +254,12 @@ action = sys.argv[1]
 
 match action:
     case "to_jsonl_dataset":
-        if len(sys.argv) < 4:
-            raise ValueError(f"Expected command format: {sys.argv[0]} {sys.argv[1]} <input-path> <output-path>")
-        input_path = sys.argv[2]
-        output_path = sys.argv[3]
-        to_jsonl_dataset(input_path, output_path)
+        if len(sys.argv) < 5:
+            raise ValueError(f"Expected command format: {sys.argv[0]} {sys.argv[1]} <sent-input-path> <amr-input-path> <output-path>")
+        sent_input_path = sys.argv[2]
+        amr_input_path = sys.argv[3]
+        output_path = sys.argv[4]
+        to_jsonl_dataset(sent_input_path, amr_input_path, output_path)
 
     case _:
         raise ValueError(f"Unexpected action: {action}")
