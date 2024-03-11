@@ -111,9 +111,17 @@ def to_amr_with_pointer(amr: str):
         elif status == "find_end_of_relation":
             if c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789":
                 current_token += c
-            elif c.isspace():
+            elif c.isspace() or c == "(" or c == "\"":
                 result += f" {current_token} "
-                status = "find_left_or_begin_of_value"
+                if c == "(":
+                    result += "( "
+                    level += 1
+                    status = "find_begin_of_new_node_name"
+                elif c == "\"":
+                    result += c
+                    status = "find_end_of_literal_value"
+                else:
+                    status = "find_left_or_begin_of_value"
             else:
                 raise ValueError(f"Unexpected char of relation: \"{c}\"")
             
