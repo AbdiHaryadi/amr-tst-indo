@@ -1,5 +1,4 @@
 import json
-import pandas as pd
 import re
 import sys
 
@@ -193,7 +192,10 @@ def to_amr_with_pointer(amr: str):
 def is_node_name(current_token):
     return node_name_matcher.match(current_token) is not None
 
-def amr_iter(path: str):
+def amr_only_iter(path: str):
+    """
+    DEPRECATED!
+    """
     with open(path) as fp:
         status = "find_non_empty_line"
         current_amr = ""
@@ -255,16 +257,23 @@ def amr_iter(path: str):
             except ValueError as e:
                 yield current_amr, str(e)
 
-def sent_iter(path: str, sep=";", sent_attribute="kalimat"):
+def sent_only_iter_from_csv(path: str, sep=";", sent_attribute="kalimat"):
+    """
+    DEPRECATED!
+    """
+    import pandas as pd
     df = pd.read_csv(path, sep=sep, header=0)
     for sent in df[sent_attribute].values:
         sent = sent.strip()
         yield sent
 
 def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str):
+    """
+    DEPRECATED!
+    """
     error_count = 0
     with open(output_path, mode="w") as fp_out:
-        for sent, (amr, error_message) in zip(sent_iter(sent_input_path), amr_iter(amr_input_path), strict=True):
+        for sent, (amr, error_message) in zip(sent_only_iter_from_csv(sent_input_path), amr_only_iter(amr_input_path), strict=True):
             if error_message == "":
                 print(
                     json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
@@ -280,6 +289,104 @@ def to_jsonl_dataset(sent_input_path: str, amr_input_path: str, output_path: str
 
     print(f"{error_count=}")
 
+SENT_PREFIX = "# ::snt "
+def sent_amr_iter(path: str):
+    sent_offset = len(SENT_PREFIX)
+
+    with open(path) as fp:
+        status = "find_non_empty_line"
+        current_amr = ""
+        current_sent = ""
+
+        for line in fp:
+            line = line.strip()
+            match status:
+                case "find_non_empty_line":
+                    if line == "":
+                        continue
+
+                    if line.startswith("("):
+                        current_sent = ""
+                        current_amr = line
+                        status = "select_amr_until_blank_line"
+                    else:
+                        if line.startswith(SENT_PREFIX):
+                            current_sent = line[sent_offset:].strip()
+                        status = "find_end_of_header"
+
+                case "find_end_of_header":
+                    if line.startswith("("):
+                        current_amr = line
+                        status = "select_amr_until_blank_line"
+                    elif line == "":
+                        status = "find_begin_of_amr"
+                    elif line.startswith(SENT_PREFIX):
+                        if current_sent != "":
+                            yield current_sent, ("", "AMR is empty")
+                        current_sent = line[sent_offset:].strip()
+                    # else: ignore
+
+                case "find_begin_of_amr":
+                    if line == "":
+                        continue
+                    
+                    if line.startswith("("):
+                        current_amr = line
+                        status = "select_amr_until_blank_line"
+                    else:
+                        yield current_sent, ("", "AMR is empty")
+                        current_sent = ""
+                        status = "find_end_of_header"
+                    
+                case "select_amr_until_blank_line":
+                    if line == "" or line.startswith("#"):
+                        try:
+                            yield current_sent, (to_amr_with_pointer(current_amr), "")
+                        except ValueError as e:
+                            yield current_sent, (current_amr, str(e))
+                    
+                        current_sent = ""
+                        current_amr = ""
+                        if line.startswith("#"):
+                            status = "find_end_of_header"
+                        else:
+                            status = "find_non_empty_line"
+
+                    elif current_amr == "":
+                        current_amr = line
+                        
+                    else:
+                        current_amr += " " + line
+            
+        if status == "select_amr_until_blank_line":
+            try:
+                yield current_sent, (to_amr_with_pointer(current_amr), "")
+            except ValueError as e:
+                yield current_sent, (current_amr, str(e))
+
+def to_jsonl_dataset_2(input_path: str, output_path: str):
+    error_count = 0
+    with open(output_path, mode="w") as fp_out:
+        for sent, (amr, error_message) in sent_amr_iter(input_path):
+            if error_message == "" and sent != "":
+                print(
+                    json.dumps({"sent": sent, "amr": amr, "lang": "id"}),
+                    file=fp_out
+                )
+            else:
+                if error_message == "":
+                    error_message = "Sentence is empty"
+
+                error_count += 1
+                print(f"(Error {error_count}) {error_message}")
+                print(f"Sentence: {sent}")
+                print(f"AMR:")
+                print(amr)
+                print("---")
+
+    if error_count > 0:
+        print(f"{error_count=}")
+
 if len(sys.argv) < 2:
     raise ValueError(f"Expected command format: {sys.argv[0]} <action>")
 
@@ -287,12 +394,11 @@ action = sys.argv[1]
 
 match action:
     case "to_jsonl_dataset":
-        if len(sys.argv) < 5:
-            raise ValueError(f"Expected command format: {sys.argv[0]} {sys.argv[1]} <sent-input-path> <amr-input-path> <output-path>")
-        sent_input_path = sys.argv[2]
-        amr_input_path = sys.argv[3]
-        output_path = sys.argv[4]
-        to_jsonl_dataset(sent_input_path, amr_input_path, output_path)
+        if len(sys.argv) < 4:
+            raise ValueError(f"Expected command format: {sys.argv[0]} {sys.argv[1]} <input-path> <output-path>")
+        input_path = sys.argv[2]
+        output_path = sys.argv[3]
+        to_jsonl_dataset_2(input_path, output_path)
 
     case _:
         raise ValueError(f"Unexpected action: {action}")
