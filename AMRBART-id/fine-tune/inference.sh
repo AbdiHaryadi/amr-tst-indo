@@ -30,7 +30,7 @@ python -u main.py \
     --data_dir $DataPath \
     --task "text2amr" \
     --train_file $DataPath/inference.jsonl \
-    --validation_file $ValPath/inference.jsonl \
+    --validation_file $DataPath/inference.jsonl \
     --test_file $DataPath/inference.jsonl \
     --output_dir $OutputDir \
     --cache_dir $ModelCache \
