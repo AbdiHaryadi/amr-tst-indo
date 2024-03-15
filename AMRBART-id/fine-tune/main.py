@@ -411,7 +411,7 @@ def main():
     es_callback = EarlyStoppingCallback(early_stopping_patience=training_args.early_stopping)
     training_args.max_target_length = data_args.max_target_length
 
-    # compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
+    compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -420,7 +420,7 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         callbacks=[es_callback],
-        # compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
     # Training
