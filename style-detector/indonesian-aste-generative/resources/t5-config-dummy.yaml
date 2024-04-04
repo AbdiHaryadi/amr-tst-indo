@@ -1,0 +1,31 @@
+type: "t5"
+
+main:
+  pretrained: "Wikidepia/IndoT5-base"
+  seed: 26092020
+  mode: train
+  num_worker: 2
+
+loader:
+  mode: unfilter
+  max_seq_length: 128
+  seperator: "####"
+  padding: max_length
+  truncation: True
+ 
+trainer:
+  n_gpu: 0
+  batch_size: 8
+  eval_batch_size: 8
+  learning_rate: 3.0E-4
+  epochs: 2
+  gradient_accumulation_steps: 1
+  adam_epsilon: 1.0E-8
+  weight_decay: 0
+  warm_up_step: 0
+
+generator:
+  num_beams: 2
+
+normalization:
+  mode: "edit-distance"
