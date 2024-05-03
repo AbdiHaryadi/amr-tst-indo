@@ -20,6 +20,7 @@ class AMRStyleRewriting:
             lang: str = "ind",
             word_expand_size: int = 10,
             max_score_strategy: bool = False,
+            remove_polarity_strategy: bool = True,
             reset_sense_strategy: bool = True
     ):
         """
@@ -43,6 +44,10 @@ class AMRStyleRewriting:
         in the original paper, the classifier takes into account so the returned
         word has the maximum score.
 
+        - `remove_polarity_strategy`: Default to `True`. If at least one involved
+        node has negative polarity for specific polarity, remove that polarity
+        instead of finding the antonym. If there is no polarity, don't change.
+
         - `reset_sense_strategy`: Default to `True`. For AMR frames which are
         consisted to style words, it will rewrite to the new AMR frame with
         `-00` sense number. If the value is `False`, the target sense number is
@@ -54,6 +59,7 @@ class AMRStyleRewriting:
         self.word_expand_size = word_expand_size
         self.lang = lang
         self.max_score_strategy = max_score_strategy
+        self.remove_polarity_strategy = remove_polarity_strategy
         self.reset_sense_strategy = reset_sense_strategy
 
     def __call__(
@@ -93,8 +99,11 @@ class AMRStyleRewriting:
         for w in style_words:
             if w in handled_style_words:
                 continue
+
+            if self.remove_polarity_strategy and self._is_word_consistent_with_negative_polarity_node_in_amr(new_amr, w):
+                new_amr = self._remove_polarity(new_amr, w)
             
-            if self._is_word_consistent_with_node_in_amr(new_amr, w):
+            elif self._is_word_consistent_with_node_in_amr(new_amr, w):
                 target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
                 new_amr = self._rewrite_amr_nodes(new_amr, w, target_w)
 
@@ -205,6 +214,15 @@ class AMRStyleRewriting:
         Frame format: lemma-lemmi-XX, X is number digit
         """
         return re.match(r"[a-z]+(-[a-z])*-\d\d", instance)
+    
+    def _is_word_consistent_with_negative_polarity_node_in_amr(self, amr: penman.Graph, word: str):
+        for var, rel, instance in amr.triples:
+            if rel == ":instance" and self._is_word_consistent_with_instance(word, instance):
+                for other_var, other_rel, polarity in amr.triples:
+                    if other_var == var and other_rel == ":polarity" and polarity == "-":
+                        return True
+
+        return False
 
     def _is_word_consistent_with_node_in_amr(self, amr: penman.Graph, word: str):
         for instance in amr.instances():
@@ -224,6 +242,41 @@ class AMRStyleRewriting:
 
         return False
 
+    def _remove_polarity(self, amr: penman.Graph, source_word: str):
+        new_amr = amr
+        for var, rel, instance in amr.triples:
+            if rel == ":instance":
+                if self._is_word_consistent_with_instance(source_word, instance):
+                    new_amr = self._remove_polarity_at_var(new_amr, var)
+
+        return new_amr
+    
+    def _remove_polarity_at_var(self, amr: penman.Graph, selected_var: str):
+        new_triples = []
+        new_epidata = {}
+
+        # Find polarity
+        found = False
+        prev_t = None
+        for t, op in amr.epidata.items():
+            if not found:
+                var, rel, polarity = t
+                if var == selected_var and rel == ":polarity" and polarity == "-":
+                    # Remove this.
+                    assert prev_t is not None
+                    new_epidata[prev_t] += op
+                    found = True
+                    continue
+
+            new_triples.append(t)
+            new_epidata[t] = op
+            prev_t = t
+
+        if not found:
+            raise ValueError(f"Cannot found an instance from \"{selected_var}\"")
+
+        return penman.Graph(triples=new_triples, top=amr.top, epidata=new_epidata, metadata=amr.metadata)
+    
     def _rewrite_amr_nodes(self, amr: penman.Graph, source_word: str, target_word: str):
         new_amr = amr
         for var, rel, instance in amr.triples:
