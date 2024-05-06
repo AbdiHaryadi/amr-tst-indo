@@ -8,9 +8,9 @@ import penman
 import re
 from transformers import pipeline
 
-class AMRStyleRewriting:
+class StyleRewriting:
     """
-    Class for rewriting AMR from specific style, based on [Shi et al. (2023)](https://aclanthology.org/2023.findings-acl.260.pdf).
+    Class for style rewriting implementation, based on [Shi et al. (2023)](https://aclanthology.org/2023.findings-acl.260.pdf).
     """
 
     def __init__(
@@ -24,7 +24,7 @@ class AMRStyleRewriting:
             reset_sense_strategy: bool = True
     ):
         """
-        Initialize `AMRStyleRewriting` class.
+        Initialize `StyleRewriting` class.
 
         Args:
         - `style_clf_hf_checkpoint`: The Huggingface checkpoint for style
