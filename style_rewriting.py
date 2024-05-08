@@ -144,17 +144,17 @@ class StyleRewriting:
         while len(style_word_list) > 0:
             antonym_list = []
 
-            for style_word in style_word_list:
-                current_antonym_list = self._get_antonym_list(style_word)
+            for current_style_word in style_word_list:
+                current_antonym_list = self._get_antonym_list(current_style_word)
                 if verbose:
-                    print(f"{style_word=}")
+                    print(f"{current_style_word=}")
                     print(f"{current_antonym_list=}")
 
                 for a in current_antonym_list:
                     if a not in antonym_list:
                         antonym_list.append(a)
 
-                tried_style_word_set.add(style_word)
+                tried_style_word_set.add(current_style_word)
 
             if verbose:
                 print(f"{style_word_list=}")
@@ -183,10 +183,10 @@ class StyleRewriting:
             # else: expand the words
 
             new_style_word_list = []
-            for style_word in style_word_list:
-                fasttext_result = self.fasttext_model.get_nearest_neighbors(style_word, k=self.word_expand_size)
+            for current_style_word in style_word_list:
+                fasttext_result = self.fasttext_model.get_nearest_neighbors(current_style_word, k=self.word_expand_size)
                 if verbose:
-                    print(f"{style_word=}")
+                    print(f"{current_style_word=}")
                     print(f"{fasttext_result=}")
 
                 for _, new_style_word in fasttext_result:
