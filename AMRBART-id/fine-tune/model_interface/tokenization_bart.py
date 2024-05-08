@@ -65,7 +65,6 @@ class AMRBartTokenizer(MBart50Tokenizer):
         self.amr_bos_token_id = self.vocab[self.amr_bos_token]
         self.amr_eos_token = "</AMR>"
         self.amr_eos_token_id = self.vocab[self.amr_eos_token]
-        print(f"Added {self.modified} AMR tokens")
 
     def _tokenize(self, text):
         """ Tokenize a string. Modified in order to handle sentences with recategorization pointers"""

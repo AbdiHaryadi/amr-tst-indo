@@ -57,17 +57,11 @@ class AMRParsingDataSet(Dataset):
         if self.test_file is not None:
             data_files["test"] = self.test_file
         
-        # print("datafiles:", data_files)
-        print("Dataset cache dir:", self.cache_dir)
-        # exit()
         self.datasets = load_dataset(
             f"{os.path.dirname(__file__)}/data.py",
             data_files=data_files,
             keep_in_memory=False,
         )
-        column_names = self.datasets["train"].column_names
-        print("datasets:", self.datasets)
-        print("colums:", column_names)
 
     def tokenize_function(self, examples):
         amr = examples["src"]  # AMR tokens
@@ -192,17 +186,12 @@ class AMR2TextDataSet(Dataset):
             
         if self.test_file is not None:
             data_files["test"] = self.test_file
-        # print("datafiles:", data_files)
-        print("Dataset cache dir:", self.cache_dir)
-        # exit()
+        
         self.datasets = load_dataset(
             f"{os.path.dirname(__file__)}/data.py",
             data_files=data_files,
             keep_in_memory=False,
         )
-        column_names = self.datasets["train"].column_names
-        print("datasets:", self.datasets)
-        print("colums:", column_names)
 
     def tokenize_function(self, examples):
         src = examples["src"]  # AMR tokens

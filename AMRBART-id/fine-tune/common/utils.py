@@ -94,7 +94,6 @@ def mask_tokens(
 
 
 def save_dummy_batch(batch, tokenizer, output_dir):
-    print("Saving dummy inputs...")
     json_out_path = open(output_dir + "/dummy_input.json", "w", encoding="utf-8")
     ith_dict = {}
     for k, v in batch.items():
