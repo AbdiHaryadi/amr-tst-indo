@@ -17,8 +17,10 @@ class StyleRewriting:
             self,
             style_clf_hf_checkpoint: str,
             fasttext_model_path: str,
+            *,
             lang: str = "ind",
             word_expand_size: int = 10,
+            ignore_and_warn_if_target_word_not_found: bool = True,
             max_score_strategy: bool = False,
             remove_polarity_strategy: bool = True,
             reset_sense_strategy: bool = True
@@ -39,6 +41,8 @@ class StyleRewriting:
 
         - `lang`: Supported language. Indonesia (`ind`) is the default.
 
+        - `ignore_and_warn_if_target word_not_found`: Default to `True`.
+
         - `max_score_strategy`: Default to `False`. If it's `True`, for the case
         of multiple valid target words, instead of returning the first word like
         in the original paper, the classifier takes into account so the returned
@@ -58,6 +62,7 @@ class StyleRewriting:
         self.fasttext_model = fasttext.load_model(fasttext_model_path)
         self.word_expand_size = word_expand_size
         self.lang = lang
+        self.ignore_and_warn_if_target_word_not_found = ignore_and_warn_if_target_word_not_found
         self.max_score_strategy = max_score_strategy
         self.remove_polarity_strategy = remove_polarity_strategy
         self.reset_sense_strategy = reset_sense_strategy
@@ -105,7 +110,8 @@ class StyleRewriting:
             
             elif self._is_word_consistent_with_node_in_amr(new_amr, w):
                 target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
-                new_amr = self._rewrite_amr_nodes(new_amr, w, target_w)
+                if target_w is not None:
+                    new_amr = self._rewrite_amr_nodes(new_amr, w, target_w)
 
             handled_style_words.append(w)
             
@@ -174,6 +180,7 @@ class StyleRewriting:
             # All antonym_list element has been iterated
             if chosen_a is not None:
                 return chosen_a
+            # else: expand the words
 
             new_style_word_list = []
             for style_word in style_word_list:
@@ -192,7 +199,11 @@ class StyleRewriting:
 
             style_word_list = new_style_word_list
 
-        raise NotImplementedError("Cannot find antonym style words, even with Fasttext, and no implementation for that case.")
+        if self.ignore_and_warn_if_target_word_not_found:
+            print(f"Warning: target word for \"{style_word}\" is not found with source style {source_style}. Ignored.")
+            return None
+
+        raise NotImplementedError(f"Target word for \"{style_word}\" is not found with source style {source_style}")
 
     def _get_text_without_style_words(self, text: str, style_words: list[str]):
         ss_tokens = text.split(" ")
