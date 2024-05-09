@@ -15,7 +15,6 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 from datasets import load_dataset, load_metric, load_from_disk
-from model_interface.modeling_bart import MBartForConditionalGeneration as BartForConditionalGeneration
 from model_interface.tokenization_bart import AMRBartTokenizer
 from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainingArguments
 from common.utils import smart_emb_init, calculate_smatch
@@ -28,6 +27,7 @@ from transformers import (
     HfArgumentParser,
     MBart50Tokenizer,
     MBart50TokenizerFast,
+    MBartForConditionalGeneration as BartForConditionalGeneration,
     MBartTokenizer,
     MBartTokenizerFast,
     set_seed,

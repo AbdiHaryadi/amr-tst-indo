@@ -1,8 +1,7 @@
 # coding:utf-8
 from typing import Optional
 from dataclasses import dataclass, field
-from common.training_args import TrainingArguments
-
+from transformers.training_args import TrainingArguments
 
 @dataclass
 class ModelArguments:
