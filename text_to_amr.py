@@ -5,12 +5,12 @@ from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainin
 from data_interface.dataset import AMRParsingDataSet, DataCollatorForAMRParsing
 import datasets
 from datasets import load_from_disk
-from huggingface_hub import snapshot_download
 import json
 import logging
 from model_interface.modeling_bart import MBartForConditionalGeneration as BartForConditionalGeneration
 from model_interface.tokenization_bart import AMRBartTokenizer
 import os
+import penman
 from seq2seq_trainer import Seq2SeqTrainer
 import transformers
 from transformers import (
@@ -133,6 +133,11 @@ def setup_logging(log_level):
 
 DEFAULT_ROOT_DIR = os.path.join(os.path.dirname(__file__), "AMRBART-id")
 class TextToAMR:
+    """
+    Class for transforming text to AMR, a.k.a. AMR parsing. This is a simplified version of
+    `AMRBART-id/fine-tune/main.py` from Nafkhan.
+    """
+
     def __init__(
             self,
             model_name: str,
@@ -140,7 +145,18 @@ class TextToAMR:
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
     ):
-        # Default root_dir: parent of fine-tune (project root)
+        """
+        Initialize `TextToAMR` class.
+
+        Args:
+        - `model_name`: Model name which the model can be referred to `<root_dir>/models/<model_name>`
+
+        - `root_dir`: Root of directory, used for store data, model, or cache.
+
+        - `dataset`: Name of folder which contains `inference.json` that will be used for test dataset.
+
+        - `logging_at_training_process_level`: If it's `True`, there's a lot of log.
+        """
 
         output_dir_parent = f"{root_dir}/outputs"
         mkdir_if_not_exists(output_dir_parent)
@@ -197,7 +213,13 @@ class TextToAMR:
 
         self.model_name = model_name
 
-    def __call__(self, sentences: list[str]):
+    def __call__(self, sentences: list[str]) -> list[penman.Graph]:
+        """
+        Transform all sentences into AMR graphs.
+
+        Args:
+        - `sentences`: List of sentence.
+        """
         trainer = Seq2SeqTrainer(
             model=self.model,
             args=self.training_args,
@@ -240,6 +262,22 @@ class TextToAMR:
 
     @staticmethod
     def from_huggingface(repo_id: str, model_name: str, root_dir: str = DEFAULT_ROOT_DIR, hf_kwargs: dict = {}, **kwargs):
+        """
+        Load model from Huggingface. Basically, it uses `huggingface_hub.snapshot_download`. Make sure
+        `huggingface_hub` has been installed since it's an optional library.
+
+        Args:
+        - `repo_id`: Huggingface repository ID. Repository should contains a folder that contains text-to-AMR model.
+
+        - `model_name`: This model name should related to a folder name that contains text-to-AMR model.
+
+        - `root_dir`: Root of directory, used for store data, model, or cache.
+
+        - `hf_kwargs`: Any other arguments that want to be passed into `huggingface_hub.snapshot_download`.
+
+        - `kwargs`: Any other arguments that want to be passed for `TextToAMR` initialization.
+        """
+        from huggingface_hub import snapshot_download
         local_dir = f"{root_dir}/models"
         mkdir_if_not_exists(local_dir)
         snapshot_download(repo_id=repo_id, local_dir=local_dir, **hf_kwargs)
@@ -280,7 +318,7 @@ class TextToAMR:
         return predict_dataset
     
     def _make_graphs(self, preds):
-        graphs = []
+        graphs: list[penman.Graph] = []
         for idx in range(len(preds)):
             ith_pred = preds[idx]
             ith_pred[0] = self.tokenizer.bos_token_id
@@ -292,6 +330,8 @@ class TextToAMR:
             graph, status, (lin, backr) = self.tokenizer.decode_amr(
                 ith_pred, restore_name_ops=False
             )
+            assert isinstance(graph, penman.Graph)
+
             graph.status = status
             graph.nodes = lin
             graph.backreferences = backr
