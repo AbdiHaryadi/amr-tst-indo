@@ -1,4 +1,4 @@
-accelerate=0.30.0
+accelerate==0.30.0
 amrlib==0.8.0
 cached-property==1.5.2
 ConfigArgParse==1.7
