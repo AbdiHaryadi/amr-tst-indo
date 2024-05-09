@@ -133,27 +133,6 @@ class MBart50Tokenizer(PreTrainedTokenizer):
         self.sp_model.Load(str(vocab_file))
         self.vocab_file = vocab_file
 
-        # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
-
-        kwargs["additional_special_tokens"] = kwargs.get("additional_special_tokens", [])
-        kwargs["additional_special_tokens"] += [
-            code for code in FAIRSEQ_LANGUAGE_CODES if code not in kwargs["additional_special_tokens"]
-        ]
-
-        super().__init__(
-            src_lang=src_lang,
-            tgt_lang=tgt_lang,
-            eos_token=eos_token,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            pad_token=pad_token,
-            mask_token=mask_token,
-            sp_model_kwargs=self.sp_model_kwargs,
-            **kwargs,
-        )
-
         # Original fairseq vocab and spm vocab must be "aligned":
         # Vocab    |    0    |    1    |   2    |    3    |  4  |  5  |  6  |   7   |   8   |  9
         # -------- | ------- | ------- | ------ | ------- | --- | --- | --- | ----- | ----- | ----
@@ -179,6 +158,28 @@ class MBart50Tokenizer(PreTrainedTokenizer):
         self._src_lang = src_lang if src_lang is not None else "en_XX"
         self.cur_lang_code_id = self.lang_code_to_id[self._src_lang]
         self.tgt_lang = tgt_lang
+
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
+
+        kwargs["additional_special_tokens"] = kwargs.get("additional_special_tokens", [])
+        kwargs["additional_special_tokens"] += [
+            code for code in FAIRSEQ_LANGUAGE_CODES if code not in kwargs["additional_special_tokens"]
+        ]
+
+        super().__init__(
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            eos_token=eos_token,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            pad_token=pad_token,
+            mask_token=mask_token,
+            sp_model_kwargs=self.sp_model_kwargs,
+            **kwargs,
+        )
+
         self.set_src_lang_special_tokens(self._src_lang)
 
         self.sp_unk_token_id = self.sp_model.PieceToId("<unk>")
