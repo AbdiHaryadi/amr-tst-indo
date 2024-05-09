@@ -27,8 +27,6 @@ torchmetrics
 tqdm
 transformers==4.40.1
 wandb
--r indonesian-aste-generative/requirements.txt
-
 
 # This library version should be fixed until Indonesian stanza doesn't have any hash problem.
 stanza==1.4.2
