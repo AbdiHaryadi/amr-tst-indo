@@ -7,7 +7,6 @@ import datasets
 from datasets import load_from_disk
 import json
 import logging
-from model_interface.modeling_bart import MBartForConditionalGeneration as BartForConditionalGeneration
 from model_interface.tokenization_bart import AMRBartTokenizer
 import os
 import penman
@@ -17,6 +16,7 @@ from transformers import (
     AutoConfig,
     MBartTokenizer,
     MBartTokenizerFast,
+    MBartForConditionalGeneration as BartForConditionalGeneration,
     set_seed
 )
 
