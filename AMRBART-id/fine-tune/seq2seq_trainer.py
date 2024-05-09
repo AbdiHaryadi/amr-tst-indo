@@ -28,7 +28,7 @@ from transformers.trainer_utils import PredictionOutput
 from transformers.dependency_versions_check import dep_version_check
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from transformers.modeling_utils import PreTrainedModel
-from common.training_args import TrainingArguments
+from transformers.training_args import TrainingArguments
 from common.utils import save_dummy_batch
 from transformers.data.data_collator import DataCollator
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
