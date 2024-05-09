@@ -22,7 +22,6 @@ from packaging import version
 from transformers.deepspeed import is_deepspeed_zero3_enabled
 from transformers.trainer import Trainer
 from transformers.trainer_utils import PredictionOutput
-from transformers.dependency_versions_check import dep_version_check
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from transformers.modeling_utils import PreTrainedModel
 from transformers.training_args import TrainingArguments
@@ -30,20 +29,17 @@ from common.utils import save_dummy_batch
 from transformers.data.data_collator import DataCollator
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.optimization import get_scheduler
-from transformers.modeling_utils import PreTrainedModel, load_sharded_checkpoint, unwrap_model
-from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES, MODEL_MAPPING_NAMES
+from transformers.modeling_utils import PreTrainedModel, unwrap_model
+from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from transformers.utils import (
     is_apex_available,
     is_sagemaker_mp_enabled,
     logging,
 )
 
-from transformers.integrations import is_fairscale_available
-
 from transformers.trainer_utils import (
     EvalPrediction,
     PredictionOutput,
-    ShardedDDPOption,
     speed_metrics,
 )
 from transformers.trainer_callback import TrainerCallback
@@ -53,10 +49,6 @@ logger = logging.get_logger(__name__)
 
 if is_apex_available():
     from apex import amp
-
-if is_fairscale_available():
-    dep_version_check("fairscale")
-    from fairscale.optim import OSS
 
 if is_sagemaker_mp_enabled():
     import smdistributed.modelparallel.torch as smp
@@ -150,23 +142,16 @@ class Seq2SeqTrainer(Trainer):
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
 
-            if self.sharded_ddp == ShardedDDPOption.SIMPLE:
-                self.optimizer = OSS(
-                    params=optimizer_grouped_parameters,
-                    optim=optimizer_cls,
-                    **optimizer_kwargs,
-                )
-            else:
-                self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
-                if optimizer_cls.__name__ == "Adam8bit":
-                    import bitsandbytes
+            self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
+            if optimizer_cls.__name__ == "Adam8bit":
+                import bitsandbytes
 
-                    manager = bitsandbytes.optim.GlobalOptimManager.get_instance()
+                manager = bitsandbytes.optim.GlobalOptimManager.get_instance()
 
-                    for module in opt_model.modules():
-                        if isinstance(module, nn.Embedding):
-                            manager.register_module_override(module, "weight", {"optim_bits": 32})
-                            logger.debug(f"bitsandbytes: will optimize {module} in fp32")
+                for module in opt_model.modules():
+                    if isinstance(module, nn.Embedding):
+                        manager.register_module_override(module, "weight", {"optim_bits": 32})
+                        logger.debug(f"bitsandbytes: will optimize {module} in fp32")
 
         if is_sagemaker_mp_enabled():
             self.optimizer = smp.DistributedOptimizer(self.optimizer)
