@@ -3,10 +3,11 @@ sys.path.append("./indonesian-aste-generative")
 
 from demo import load_generator
 import stanza
+import string
 
 class StyleDetector:
     """
-    Class for style detector implementation, based on [Shi et al. (2023)](https://aclanthology.org/2023.findings-acl.260.pdf).
+    Class for style detector implementation. The detection uses [William's opinion triplet extraction](https://github.com/William9923/indonesian-aste-generative/tree/master).
     """
 
     def __init__(self, config_path: str, model_path: str, *, lang: str = "id"):
@@ -26,16 +27,20 @@ class StyleDetector:
         stanza.download(lang=lang)
         self.nlp = stanza.Pipeline(lang=lang, processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True)
 
-    def __call__(self, text: str, verbose: bool = False) -> list[str]:
+    def __call__(self, sentence: str, verbose: bool = False) -> list[str]:
         """
-        Detect style words from `text`.
+        Detect style words from `sentence`.
 
         Args:
-        - `text`: Pretokenized text. The token should be space-separated.
+        - `sentence`: Sentence input.
 
         - `verbose`: If it's True, print additional informations in the process.
         """
-        data = self.generator(text)
+        preprocessed_sentence = self._preprocess_sentence(sentence)
+        if verbose:
+            print("Preprocessed sentence:", preprocessed_sentence)
+
+        data = self.generator(preprocessed_sentence)
         if verbose:
             for x in data:
                 print("Triplet:", x)
@@ -95,3 +100,21 @@ class StyleDetector:
             results.append(head_word)
 
         return results
+
+    def _preprocess_sentence(self, sentence: str):
+        lowercased_sentence = sentence.lower()
+        preprocessed_sentence = ""
+        current_is_not_a_letter_or_digit = False
+        for c in lowercased_sentence:
+            if c in string.ascii_lowercase or c in string.digits:
+                if current_is_not_a_letter_or_digit:
+                    preprocessed_sentence += " "
+                current_is_not_a_letter_or_digit = False
+            else:
+                preprocessed_sentence += " "
+                current_is_not_a_letter_or_digit = True
+
+            preprocessed_sentence += c
+
+        preprocessed_sentence = " ".join(preprocessed_sentence.strip().split())
+        return preprocessed_sentence
