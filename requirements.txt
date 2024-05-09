@@ -1,0 +1,34 @@
+amrlib
+cached_property
+configargparse
+datasets
+editdistance
+evaluate
+fasttext
+h5py-cache
+networkx
+nltk
+numpy
+pandas
+Penman
+pytorch-ignite
+PyYAML
+regex
+rouge-score
+sacrebleu
+sacremoses
+scikit-learn
+sentencepiece
+sentence-transformers
+smatch
+tensorboardX
+torch
+torchmetrics
+tqdm
+transformers==4.40.1
+wandb
+-r indonesian-aste-generative/requirements.txt
+
+
+# This library version should be fixed until Indonesian stanza doesn't have any hash problem.
+stanza==1.4.2
