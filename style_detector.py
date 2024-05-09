@@ -27,20 +27,20 @@ class StyleDetector:
         stanza.download(lang=lang)
         self.nlp = stanza.Pipeline(lang=lang, processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True)
 
-    def __call__(self, sentence: str, verbose: bool = False) -> list[str]:
+    def __call__(self, text: str, verbose: bool = False) -> list[str]:
         """
-        Detect style words from `sentence`.
+        Detect style words from `text`.
 
         Args:
-        - `sentence`: Sentence input.
+        - `text`: Text input.
 
         - `verbose`: If it's True, print additional informations in the process.
         """
-        preprocessed_sentence = self._preprocess_sentence(sentence)
+        preprocessed_text = self._preprocess_text(text)
         if verbose:
-            print("Preprocessed sentence:", preprocessed_sentence)
+            print("Preprocessed text result:", preprocessed_text)
 
-        data = self.generator(preprocessed_sentence)
+        data = self.generator(preprocessed_text)
         if verbose:
             for x in data:
                 print("Triplet:", x)
@@ -101,20 +101,20 @@ class StyleDetector:
 
         return results
 
-    def _preprocess_sentence(self, sentence: str):
-        lowercased_sentence = sentence.lower()
-        preprocessed_sentence = ""
+    def _preprocess_text(self, text: str):
+        lowercased_text = text.lower()
+        preprocessed_text = ""
         current_is_not_a_letter_or_digit = False
-        for c in lowercased_sentence:
+        for c in lowercased_text:
             if c in string.ascii_lowercase or c in string.digits:
                 if current_is_not_a_letter_or_digit:
-                    preprocessed_sentence += " "
+                    preprocessed_text += " "
                 current_is_not_a_letter_or_digit = False
             else:
-                preprocessed_sentence += " "
+                preprocessed_text += " "
                 current_is_not_a_letter_or_digit = True
 
-            preprocessed_sentence += c
+            preprocessed_text += c
 
-        preprocessed_sentence = " ".join(preprocessed_sentence.strip().split())
-        return preprocessed_sentence
+        preprocessed_text = " ".join(preprocessed_text.strip().split())
+        return preprocessed_text
