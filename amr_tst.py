@@ -19,6 +19,8 @@ class AMRTST:
         self.sr = sr
 
     def __call__(self, texts: list[str], source_styles: list[str]):
+        assert len(texts) == len(source_styles)
+
         print("Warning: AMR Generator is not implemented, returning (list of empty string, infos)")
         graphs = self.t2a(texts)
 
