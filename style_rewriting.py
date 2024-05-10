@@ -110,7 +110,12 @@ class StyleRewriting:
             
             elif self._is_word_consistent_with_node_in_amr(new_amr, w):
                 target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
-                if target_w is not None:
+                if target_w is None:
+                    if self.ignore_and_warn_if_target_word_not_found:
+                        print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
+                    else:
+                        raise NotImplementedError(f"For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}.")
+                else:
                     new_amr = self._rewrite_amr_nodes(new_amr, w, target_w)
 
             handled_style_words.append(w)
@@ -199,11 +204,7 @@ class StyleRewriting:
 
             style_word_list = new_style_word_list
 
-        if self.ignore_and_warn_if_target_word_not_found:
-            print(f"Warning: target word for \"{style_word}\" is not found with source style {source_style}. Ignored.")
-            return None
-
-        raise NotImplementedError(f"Target word for \"{style_word}\" is not found with source style {source_style}")
+        return None
 
     def _get_text_without_style_words(self, text: str, style_words: list[str]):
         ss_tokens = text.split(" ")
