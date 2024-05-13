@@ -62,12 +62,14 @@ class AMRData(datasets.GeneratorBasedBuilder):
         dev_path = self.config.data_files["validation"] if "validation" in self.config.data_files else None
         test_path = self.config.data_files["test"] if "test" in self.config.data_files else None
         
-        train_generator = datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": train_path})
-        dev_generator = datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": dev_path})
-        test_generator = datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={"filepath": test_path})
-        return [
-            train_generator, dev_generator, test_generator
-        ]
+        generator_list = []
+        if train_path is not None:
+            generator_list.append(datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": train_path}))
+        if dev_path is not None:
+            generator_list.append(datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": dev_path}))
+        if test_path is not None:
+            generator_list.append(datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={"filepath": test_path}))
+        return generator_list
 
     def _generate_examples(self, filepath):
         """Yields examples."""

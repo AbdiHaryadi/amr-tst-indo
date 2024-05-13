@@ -113,8 +113,6 @@ def prepare_data_args(data_path):
     data_args = DataTrainingArguments(
         data_dir=data_path,
         unified_input=True,
-        train_file=f"{data_path}/inference.jsonl", # Why you need this???
-        validation_file=f"{data_path}/inference.jsonl", # Why you need this???
         test_file=f"{data_path}/inference.jsonl",
         data_cache_dir=data_cache,
         overwrite_cache=True,
@@ -292,7 +290,7 @@ class TextToAMR:
                 print(json_str, file=fp)
 
         raw_datasets = AMRParsingDataSet(self.tokenizer, data_args, self.model_args)
-        column_names = raw_datasets.datasets["train"].column_names
+        column_names = raw_datasets.datasets["test"].column_names
 
         if "test" not in raw_datasets.datasets:
             raise ValueError("--do_predict requires a test dataset")
