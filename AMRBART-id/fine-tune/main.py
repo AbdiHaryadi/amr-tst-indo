@@ -78,8 +78,8 @@ def main():
         )
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    assert training_args.task in ("amr2text", "text2amr"), f"Invalid task name:{training_args.task}, should be in ['amr2text', 'text2amr')"
+    
+    assert training_args.task == "text2amr", f"Invalid task name:{training_args.task}, should be in ['text2amr']"
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -192,12 +192,11 @@ def main():
         )
     
     if bool(os.environ.get("IS_CONCAT", "False") == "True"):
-        from data_interface_concat.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing
+        from data_interface_concat.dataset import AMRParsingDataSet, DataCollatorForAMRParsing
     else:
-        from data_interface.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing
-
-    DataSetCate = AMR2TextDataSet if training_args.task == "amr2text" else AMRParsingDataSet
-    raw_datasets = DataSetCate(tokenizer, data_args, model_args)
+        from data_interface.dataset import AMRParsingDataSet, DataCollatorForAMRParsing
+    
+    raw_datasets = AMRParsingDataSet(tokenizer, data_args, model_args)
 
     column_names = raw_datasets.datasets["train"].column_names
 
@@ -272,9 +271,7 @@ def main():
 
     # label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     label_pad_token_id = tokenizer.pad_token_id
-
-    DataCollatorCate = DataCollatorForAMR2Text if training_args.task == "amr2text" else DataCollatorForAMRParsing
-    data_collator = DataCollatorCate(
+    data_collator = DataCollatorForAMRParsing(
         tokenizer,
         label_pad_token_id=label_pad_token_id,
         pad_to_multiple_of=8 if training_args.fp16 else None,
