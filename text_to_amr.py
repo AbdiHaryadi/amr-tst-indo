@@ -290,7 +290,7 @@ class TextToAMR:
                 print(json_str, file=fp)
 
         raw_datasets = AMRParsingDataSet(self.tokenizer, data_args, self.model_args)
-        column_names = raw_datasets.datasets["train"].column_names
+        column_names = raw_datasets.datasets["test"].column_names
 
         if "test" not in raw_datasets.datasets:
             raise ValueError("--do_predict requires a test dataset")
