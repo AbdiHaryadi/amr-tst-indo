@@ -113,8 +113,6 @@ def prepare_data_args(data_path):
     data_args = DataTrainingArguments(
         data_dir=data_path,
         unified_input=True,
-        train_file=f"{data_path}/inference.jsonl", # Why you need this???
-        validation_file=f"{data_path}/inference.jsonl", # Why you need this???
         test_file=f"{data_path}/inference.jsonl",
         data_cache_dir=data_cache,
         overwrite_cache=True,
