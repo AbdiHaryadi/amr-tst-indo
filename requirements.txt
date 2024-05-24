@@ -23,7 +23,7 @@ sentence-transformers==2.7.0
 sentencepiece==0.1.99
 smatch==1.0.4
 tensorboardX==2.6.2.2
-torch==2.2.1+cu121
+torch==2.2.1 --index-url https://download.pytorch.org/whl/cu121
 torchmetrics==1.4.0
 tqdm==4.66.4
 transformers==4.40.1
