@@ -66,9 +66,6 @@ class AMRParsingDataSet(Dataset):
     def tokenize_function(self, examples):
         amr = examples["src"]  # AMR tokens
         txt = examples["tgt"]  # Text tokens
-        # del examples["lang"]
-
-        # txt = [inp.lower() for inp in txt]
 
         amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
 

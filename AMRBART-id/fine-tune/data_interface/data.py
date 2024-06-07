@@ -17,9 +17,7 @@
 """AMR dataset."""
 
 
-from inspect import EndOfBlock
 import json
-import os
 
 import datasets
 
