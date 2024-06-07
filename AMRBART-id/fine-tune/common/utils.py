@@ -13,8 +13,7 @@ from rouge_score import rouge_scorer, scoring
 from sacrebleu import corpus_bleu
 from typing import Dict, List, Tuple
 from transformers import PreTrainedTokenizer, EvalPrediction
-from typing import Callable, Dict, Iterable, List, Tuple, Union
-from collections import Counter
+from typing import Callable, Dict, Iterable, List, Tuple
 from common.constant import ROUGE_KEYS
 nltk.data.path.append("/mnt/nfs-storage/nltk_data/")
 
@@ -24,19 +23,6 @@ def add_newline_to_end_of_each_sentence(x: str) -> str:
     re.sub("<n>", "", x)  # remove pegasus newline char
     assert nltk, "nltk must be installed to separate newlines between sentences. (pip install nltk)"
     return "\n".join(nltk.sent_tokenize(x))
-
-
-# def set_seed(seed):
-#     # print(f"Setting seed to {seed}")
-#     random.seed(seed)
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
-#     torch.cuda.manual_seed(seed)
-#     torch.cuda.manual_seed_all(seed)
-#     os.environ["PYTHONHASHSEED"] = str(seed)
-#     torch.backends.cudnn.benchmark = False
-#     torch.backends.cudnn.deterministic = True
-
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -290,10 +276,8 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=-100):
     else:
         nll_loss = nll_loss.squeeze(-1)
         smooth_loss = smooth_loss.squeeze(-1)
-
-    # nll_loss = nll_loss.sum()                   # mean()? Scared to break other math.
-    # smooth_loss = smooth_loss.sum()
-    nll_loss = nll_loss.mean()                   # mean()? Scared to break other math.
+    
+    nll_loss = nll_loss.mean()
     smooth_loss = smooth_loss.mean()
     eps_i = epsilon / lprobs.size(-1)
     loss = (1.0 - epsilon) * nll_loss + eps_i * smooth_loss

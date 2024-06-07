@@ -35,18 +35,12 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     rex_arg = re.compile(f"^{tokenizer.INIT}(op|snt|conj|prep)")
     rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
 
-    # subtoken_ids.insert(1,36)           # add "(" id
-    # subtoken_ids.insert(-1, 4839)       # add ")" id
-
     # get strings
-    # subtokens = [tokenizer._convert_id_to_token(t) for t in subtoken_ids]
     subtokens = tokenizer.decode(subtoken_ids, skip_special_tokens=True).split(" ")
-    # subtokens = tokenizer.decode(subtoken_ids)
 
-    # print(">>>>> subtokens1:", subtokens, "\n")
     # fix backreferences
-    
     subtoken_backreferences = [max(t - len(tokenizer.vocab), -1) for t in subtoken_ids]
+
     # strip padding
     subtokens, subtoken_backreferences = zip(
         *[
@@ -55,7 +49,6 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             if s != ("<pad>")
         ]
     )
-    # print(">>>>> subtokens2:", subtokens, "\n")
 
     # subword collapse
     tokens = []
@@ -106,20 +99,14 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             current_token_i += 1
 
         elif subtok == '(':
-            # if tokens[-1][0] == '(':
-            #     tokens[-1] = tokens[-1] + subtok
-            # else:
-                tokens.append(subtok)
-                backreferences.append(-1)
-                current_token_i += 1
+            tokens.append(subtok)
+            backreferences.append(-1)
+            current_token_i += 1
 
         elif subtok == ')':
-            # if tokens[-1][0] == ')':
-            #     tokens[-1] = tokens[-1] + subtok
-            # else:
-                tokens.append(subtok)
-                backreferences.append(-1)
-                current_token_i += 1
+            tokens.append(subtok)
+            backreferences.append(-1)
+            current_token_i += 1
 
         elif subtok == '-':
             tokens.append(subtok)
@@ -129,18 +116,15 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
         # in any other case attach to the previous
         else:
             tokens[-1] = tokens[-1] + subtok
-
-    # print(">>>>> tokens1:", tokens, "\n")
+    
     # strip INIT and fix byte-level
     tokens = [
         tokenizer.convert_tokens_to_string(list(t)).lstrip() if isinstance(t, str) else t
         for t in tokens
     ]
-    # tokens = [t.replace(tokenizer.INIT, '') if isinstance(t, str) else t for t in tokens]
 
     # unks are substituted with thing
     tokens = [t if t != "<unk>" else "thing" for t in tokens]
-    # print(">>>>> tokens2:", tokens, "\n")
 
     old_tokens = tokens
     old_backreferences = backreferences
@@ -220,9 +204,7 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             backreferences += backreferences_addition
             break
 
-    # print(">>>>> tokens3:", tokens, "\n")
     tokens = [token_processing(t) for t in tokens]
-    # print(">>>>> tokens4:", tokens, "\n")
 
     shift = 1
     if tokens[1] == "<s>":
@@ -354,7 +336,7 @@ def _reconstruct_graph_from_nodes(nodes, backreferences):
             src_var = src_node[0].lower()
             if not src_var not in "abcdefghijklmnopqrstuvwxyz":
                 src_var = "x"
-            # src_var = f'{src_var}_{len(variable2index)}'
+            
             src_var = f"{src_var}{len(variable2index)}"
             src_var_i = old_start_index
             variable2index[src_var] = src_var_i
@@ -384,13 +366,9 @@ def _reconstruct_graph_from_nodes(nodes, backreferences):
 
             # same edge more than once
             num = cnt[src_var][e]
-            # num = 0
             if num:
-
                 if e.startswith(":op") or e.startswith(":snt"):
                     continue
-                # elif e.startswith(':ARG'):
-                #    continue
                 elif num > 3:
                     continue
 
@@ -424,7 +402,6 @@ def _reconstruct_graph_from_nodes(nodes, backreferences):
                 trg_var = n[0].lower()
                 if trg_var not in "abcdefghijklmnopqrstuvwxyz":
                     trg_var = "x"
-                # trg_var = f'{trg_var}_{len(variable2index)}'
                 trg_var = f"{trg_var}{len(variable2index)}"
                 trg_var_i = ni
                 variable2index[trg_var] = trg_var_i
@@ -461,7 +438,7 @@ class ParsedStatus(enum.Enum):
 def connect_graph_if_not_connected(graph):
 
     try:
-        encoded = encode(graph)
+        _ = encode(graph)
         return graph, ParsedStatus.OK
     except:
         pass

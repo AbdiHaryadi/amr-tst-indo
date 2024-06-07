@@ -11,10 +11,6 @@ from transformers.optimization import (
 )
 
 from transformers import (
-    WEIGHTS_NAME,
-    AdamW,
-    Adafactor,
-    AutoConfig,
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
     BartTokenizer,
@@ -53,8 +49,6 @@ recategorizations = [
     "\u0120MONEY",
     "\u0120CRIMINAL_CHARGE",
 ]
-
-# special_tokens = ["<AMR>", "</AMR>"]
 
 arg_to_scheduler = {
     "linear": get_linear_schedule_with_warmup,
