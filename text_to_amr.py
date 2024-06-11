@@ -162,7 +162,7 @@ class TextToAMR:
         output_dir = f"{output_dir_parent}/infer-{model_name}"
         mkdir_if_not_exists(output_dir)
 
-        batch_size=5
+        batch_size=1
         self.training_args = Seq2SeqTrainingArguments(
             output_dir=output_dir,
             overwrite_output_dir=True,
