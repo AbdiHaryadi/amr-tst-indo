@@ -407,11 +407,14 @@ def main():
         result["gen_len"] = np.mean(prediction_lens)
         result = {k: round(v, 4) for k, v in result.items()}
         return result
-
-    es_callback = EarlyStoppingCallback(early_stopping_patience=training_args.early_stopping)
+    
     training_args.max_target_length = data_args.max_target_length
 
     compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
+    callbacks = []
+    if training_args.early_stopping is not None:
+        callbacks.append(EarlyStoppingCallback(early_stopping_patience=training_args.early_stopping))
+
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -419,7 +422,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[es_callback],
+        callbacks=callbacks if len(callbacks) > 0 else None,
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
