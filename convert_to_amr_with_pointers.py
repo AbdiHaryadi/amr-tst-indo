@@ -303,7 +303,7 @@ def to_jsonl_dataset_2(input_path: str, output_path: str):
     if error_count > 0:
         print(f"{error_count=}")
 
-if __name__ == "__main))":
+if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise ValueError(f"Expected command format: {sys.argv[0]} <input-path> <output-path>")
     input_path = sys.argv[1]
