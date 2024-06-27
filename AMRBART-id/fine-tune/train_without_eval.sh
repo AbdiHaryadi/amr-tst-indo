@@ -7,7 +7,7 @@ DataPath=$RootDir/ds/$2
 Model=$1
 ModelCache=$RootDir/.cache
 DataCache=$DataPath/.cache/dump-amrparsing
-Epoch=$4
+Epoch=$3
 
 OutputDir=${RootDir}/outputs/$Model-fted
 
