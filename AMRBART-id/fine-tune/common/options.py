@@ -301,7 +301,7 @@ class Seq2SeqTrainingArguments(TrainingArguments):
         },
     )
     early_stopping: Optional[int] = field(
-        default=5, metadata={"help": "Early stopping patience for training"}
+        default=None, metadata={"help": "Early stopping patience for training"}
     )
     eval_lenpen: Optional[float] = field(
         default=1.0, metadata={"help": "lenpen for generation"}
