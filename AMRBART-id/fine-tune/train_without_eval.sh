@@ -24,6 +24,8 @@ fi
 lr=1e-6
 batch_size=5
 
+HubModelId=${4:-}
+
 python -u main.py \
     --overwrite_output_dir \
     --data_dir $DataPath \
@@ -55,13 +57,13 @@ python -u main.py \
     --logging_dir $OutputDir/logs \
     --logging_first_step True \
     --logging_steps 20 \
-    --save_steps 10000 \
-    --save_strategy "epoch" \
-    --save_total_limit 2 \
+    --save_steps 5000 \
+    --save_total_limit 1 \
     --seed 42 \
     --dataloader_num_workers 1 \
     --eval_dataloader_num_workers 1 \
     --do_train \
     --ddp_find_unused_parameters False \
+    --hub_model_id $HubModelId \
     --report_to "wandb" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run-$(date +"%Y-%m-%dT%H:%M:%S%:z").log
