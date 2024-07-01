@@ -57,7 +57,7 @@ python -u main.py \
     --logging_dir $OutputDir/logs \
     --logging_first_step True \
     --logging_steps 20 \
-    --save_steps 50 \
+    --save_steps 100 \
     --save_total_limit 1 \
     --seed 42 \
     --dataloader_num_workers 1 \
@@ -66,5 +66,6 @@ python -u main.py \
     --ddp_find_unused_parameters False \
     --hub_model_id $HubModelId \
     --hub_strategy "checkpoint" \
+    --hub_always_push True \
     --report_to "wandb" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run-$(date +"%Y-%m-%dT%H:%M:%S%:z").log
