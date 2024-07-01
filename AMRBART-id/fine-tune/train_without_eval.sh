@@ -65,5 +65,6 @@ python -u main.py \
     --do_train \
     --ddp_find_unused_parameters False \
     --hub_model_id $HubModelId \
+    --hub_strategy "checkpoint" \
     --report_to "wandb" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run-$(date +"%Y-%m-%dT%H:%M:%S%:z").log
