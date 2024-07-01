@@ -409,7 +409,8 @@ def main():
         return result
     
     training_args.max_target_length = data_args.max_target_length
-    training_args.hub_model_id = training_args.hub_model_id if training_args.hub_model_id else None
+    if training_args.hub_model_id:
+        training_args.push_to_hub = True
 
     compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
     callbacks = []
