@@ -276,7 +276,7 @@ class TextToAMR:
         - `kwargs`: Any other arguments that want to be passed for `TextToAMR` initialization.
         """
         from huggingface_hub import snapshot_download
-        if local_dir not in hf_kwargs:
+        if "local_dir" not in hf_kwargs:
             hf_kwargs["local_dir"] = f"{root_dir}/models"
 
         local_dir = hf_kwargs["local_dir"]
