@@ -157,7 +157,7 @@ class MBart50Tokenizer(PreTrainedTokenizer):
 
         self._src_lang = src_lang if src_lang is not None else "en_XX"
         self.cur_lang_code_id = self.lang_code_to_id[self._src_lang]
-        self.tgt_lang = tgt_lang
+        self.tgt_lang = tgt_lang if tgt_lang is not None else "en_XX"
 
         # Mask token behave like a normal word, i.e. include the space before it
         mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
