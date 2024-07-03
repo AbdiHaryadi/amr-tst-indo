@@ -239,23 +239,13 @@ class AMRToText:
         predict_results = trainer.predict(
             predict_dataset, metric_key_prefix="predict", max_length=max_length, num_beams=num_beams
         )
+        return self._make_sentences(predict_results.predictions)
 
-        # TODO: Create this sentences
-        # sentences = self._make_sentences(predict_results.predictions)
-        # assert len(graphs) == len(sentences), f"Inconsistent lengths for graphs ({len(graphs)}) vs sentences ({len(sentences)})"
-
-        # idx = 0
-        # for gp, snt in zip(graphs, sentences):
-        #     metadata = {}
-        #     metadata["id"] = str(idx)
-        #     metadata["annotator"] = self.model_name
-        #     metadata["snt"] = snt
-        #     if "save-date" in metadata:
-        #         del metadata["save-date"]
-        #     gp.metadata = metadata
-        #     idx += 1
-
-        return predict_results
+    def _make_sentences(self, predictions) -> list[str]:
+        decoded_preds: list[str] = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        assert isinstance(decoded_preds, list)
+        assert all(isinstance(x, str) for x in decoded_preds)
+        return [pred.strip() for pred in decoded_preds]
 
     @staticmethod
     def from_huggingface(repo_id: str, model_name: str, root_dir: str = DEFAULT_ROOT_DIR, hf_kwargs: dict = {}, **kwargs):
@@ -292,8 +282,10 @@ class AMRToText:
                     epidata=g.epidata,
                     metadata={}
                 )
-                pointer_g = to_amr_with_pointer(penman.encode(no_metadata_g, indent=4))
-                json_str = json.dumps({"sent": "", "amr": pointer_g, "lang": "id"})
+                pointer_g = to_amr_with_pointer(penman.encode(no_metadata_g, indent=None))
+
+                # sent is unused, but it's not empty to avoid error
+                json_str = json.dumps({"sent": "-", "amr": pointer_g, "lang": "id"})
                 print(json_str, file=fp)
 
         raw_datasets = AMR2TextDataSet(self.tokenizer, data_args, self.model_args)
