@@ -203,9 +203,10 @@ class AMR2TextDataSet(Dataset):
             tgt_ids = self.tokenizer(
                 tgt, max_length=self.max_tgt_length, padding=False, truncation=True
             )
-            tgt_ids["input_ids"] = [
-                label[1:] for label in tgt_ids["input_ids"]
-            ]
+            # In original works, the first element of input_ids is removed
+            # because of prefix. Since there is no prefix for this model, this
+            # process is not needed.
+        
         model_inputs = {}
         model_inputs["input_ids"] = src_ids
         model_inputs["labels"] = tgt_ids["input_ids"]
