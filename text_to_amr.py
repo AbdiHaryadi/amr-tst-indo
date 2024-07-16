@@ -142,6 +142,8 @@ class TextToAMR:
             root_dir: str = DEFAULT_ROOT_DIR,
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
+            annotator: str | None = None,
+            old_model: bool = False
     ):
         """
         Initialize `TextToAMR` class.
@@ -154,6 +156,8 @@ class TextToAMR:
         - `dataset`: Name of folder which contains `inference.json` that will be used for test dataset.
 
         - `logging_at_training_process_level`: If it's `True`, there's a lot of log.
+
+        - `annotator`: If it's `None`, the value will be same as `model_name`.
         """
 
         output_dir_parent = f"{root_dir}/outputs"
@@ -209,15 +213,40 @@ class TextToAMR:
             pad_to_multiple_of=8 if self.training_args.fp16 else None,
         )
 
-        self.model_name = model_name
+        self.max_src_length = min(self.data_args.max_source_length, self.tokenizer.model_max_length)
+        self.max_gen_length = (
+            self.training_args.generation_max_length
+            if self.training_args.generation_max_length is not None
+            else self.data_args.val_max_target_length
+        )
 
-    def __call__(self, sentences: list[str]) -> list[penman.Graph]:
+        if annotator is None:
+            self.annotator = model_name
+        else:
+            self.annotator = annotator
+
+        self.old_model = old_model
+
+    def __call__(self, sentences: list[str], method: int = 1) -> list[penman.Graph]:
         """
         Transform all sentences into AMR graphs.
 
         Args:
         - `sentences`: List of sentence.
         """
+        if self.old_model:
+            used_sentences = ["id_ID" + x for x in sentences]
+        else:
+            used_sentences = sentences
+
+        if method == 1:
+            return self._call_method_1(used_sentences)
+        elif method == 2:
+            return self._call_method_2(used_sentences)
+        else:
+            raise ValueError(f"No method {method}")
+
+    def _call_method_1(self, sentences):
         trainer = Seq2SeqTrainer(
             model=self.model,
             args=self.training_args,
@@ -226,17 +255,8 @@ class TextToAMR:
         )
 
         predict_dataset = self._prepare_predict_dataset(sentences)
-        max_length = (
-            self.training_args.generation_max_length
-            if self.training_args.generation_max_length is not None
-            else self.data_args.val_max_target_length
-        )
-
-        num_beams = (
-            self.data_args.num_beams
-            if self.data_args.num_beams is not None
-            else self.training_args.generation_num_beams
-        )
+        max_length = self.max_gen_length
+        num_beams = self.training_args.generation_num_beams
 
         predict_results = trainer.predict(
             predict_dataset, metric_key_prefix="predict", max_length=max_length, num_beams=num_beams
@@ -249,10 +269,43 @@ class TextToAMR:
         for gp, snt in zip(graphs, sentences):
             metadata = {}
             metadata["id"] = str(idx)
-            metadata["annotator"] = self.model_name
+            metadata["annotator"] = self.annotator
             metadata["snt"] = snt
-            if "save-date" in metadata:
-                del metadata["save-date"]
+            gp.metadata = metadata
+            idx += 1
+
+        return graphs
+    
+    def _call_method_2(self, sentences):
+        raw_txt_ids = self.tokenizer(sentences, self.max_src_length, padding=False, truncation=True)["input_ids"]
+        txt_ids = [itm[:self.max_src_length-3] + [self.tokenizer.amr_bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.amr_eos_token_id] for itm in raw_txt_ids]
+        txt_ids = self.tokenizer.pad(
+            {"input_ids": txt_ids},
+            padding=True,
+            pad_to_multiple_of=None,
+            return_tensors="pt",
+        )
+        preds = self.model.generate(
+            txt_ids["input_ids"],
+            max_length=self.max_gen_length,
+            num_beams=self.training_args.generation_num_beams,
+            use_cache=True,
+            decoder_start_token_id=self.tokenizer.amr_bos_token_id,
+            eos_token_id=self.tokenizer.amr_eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            no_repeat_ngram_size=0,
+            min_length=0,
+            length_penalty=self.training_args.eval_lenpen
+        )
+        graphs = self._make_graphs(preds)
+        assert len(graphs) == len(sentences), f"Inconsistent lengths for graphs ({len(graphs)}) vs sentences ({len(sentences)})"
+
+        idx = 0
+        for gp, snt in zip(graphs, sentences):
+            metadata = {}
+            metadata["id"] = str(idx)
+            metadata["annotator"] = self.annotator
+            metadata["snt"] = snt
             gp.metadata = metadata
             idx += 1
 
@@ -261,6 +314,8 @@ class TextToAMR:
     @staticmethod
     def from_huggingface(repo_id: str, model_name: str, root_dir: str = DEFAULT_ROOT_DIR, hf_kwargs: dict = {}, **kwargs):
         """
+        [DEPRECATED]
+
         Load model from Huggingface. Basically, it uses `huggingface_hub.snapshot_download`. Make sure
         `huggingface_hub` has been installed since it's an optional library.
 
@@ -275,6 +330,8 @@ class TextToAMR:
 
         - `kwargs`: Any other arguments that want to be passed for `TextToAMR` initialization.
         """
+        print("Warning: This is deprecated. Load manually instead by using this script:\nfrom huggingface_hub import snapshot_download\n\nsnapshot_download(repo_id=repo_id, **hf_kwargs)\nmodel = TextToAMR(model_name)")
+
         from huggingface_hub import snapshot_download
         if "local_dir" not in hf_kwargs:
             hf_kwargs["local_dir"] = f"{root_dir}/models"
@@ -331,6 +388,7 @@ class TextToAMR:
             )
             assert isinstance(graph, penman.Graph)
 
+            # Is this used?
             graph.status = status
             graph.nodes = lin
             graph.backreferences = backr
