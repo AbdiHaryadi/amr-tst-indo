@@ -198,13 +198,15 @@ def main():
 
     DataSetCate = AMR2TextDataSet if training_args.task == "amr2text" else AMRParsingDataSet
     raw_datasets = DataSetCate(tokenizer, data_args, model_args)
-
-    column_names = raw_datasets.datasets["train"].column_names
+    
+    column_names = None
 
     if training_args.do_train:
         if "train" not in raw_datasets.datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = raw_datasets.datasets["train"]
+        if column_names is None:
+            column_names = train_dataset.column_names
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
@@ -229,6 +231,8 @@ def main():
         if "validation" not in raw_datasets.datasets:
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = raw_datasets.datasets["validation"]
+        if column_names is None:
+            column_names = eval_dataset.column_names
         if data_args.max_eval_samples is not None:
             max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
             eval_dataset = eval_dataset.select(range(max_eval_samples))
@@ -252,6 +256,8 @@ def main():
         if "test" not in raw_datasets.datasets:
             raise ValueError("--do_predict requires a test dataset")
         predict_dataset = raw_datasets.datasets["test"]
+        if column_names is None:
+            column_names = predict_dataset.column_names
         if data_args.max_predict_samples is not None:
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
@@ -412,7 +418,7 @@ def main():
     if training_args.hub_model_id:
         training_args.push_to_hub = True
 
-    compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
+    # compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
     callbacks = []
     if training_args.early_stopping is not None:
         callbacks.append(EarlyStoppingCallback(early_stopping_patience=training_args.early_stopping))
@@ -425,7 +431,7 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         callbacks=callbacks if len(callbacks) > 0 else None,
-        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+        # compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
     # Training

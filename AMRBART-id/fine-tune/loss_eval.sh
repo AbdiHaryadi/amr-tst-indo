@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0
 RootDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 RootDir=$RootDir/..
 
-ValidationPath=$2
+DataPath=$RootDir/ds/$2
 
 Model=$1
 ModelCache=$RootDir/.cache
@@ -27,7 +27,7 @@ python -u main.py \
     --overwrite_output_dir \
     --data_dir $DataPath \
     --task "text2amr" \
-    --validation_file $ValidationPath \
+    --validation_file $DataPath/dev.jsonl \
     --output_dir $OutputDir \
     --cache_dir $ModelCache \
     --data_cache_dir $DataCache \
@@ -46,4 +46,5 @@ python -u main.py \
     --eval_dataloader_num_workers 1 \
     --do_eval \
     --ddp_find_unused_parameters False \
+    --report_to "none" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run-$(date +"%Y-%m-%dT%H:%M:%S%:z").log
