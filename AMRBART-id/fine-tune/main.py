@@ -1,29 +1,16 @@
 # coding=utf-8
 
 import os
-import re
 import sys
-from textwrap import indent
-import json
 import nltk  # Here to have a nice missing dependency error message early on
-import torch
-import penman
 import logging
-import datasets
-import transformers
-import numpy as np
-from dataclasses import dataclass, field
-from typing import Optional
-from datasets import load_dataset, load_metric, load_from_disk
+from datasets import load_from_disk
 from model_interface.tokenization_bart import AMRBartTokenizer
 from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainingArguments
-from common.utils import smart_emb_init, calculate_smatch
+from common.utils import smart_emb_init
 from filelock import FileLock
 from transformers import (
     AutoConfig,
-    AutoModelForSeq2SeqLM,
-    AutoTokenizer,
-    BartTokenizer,
     HfArgumentParser,
     MBart50Tokenizer,
     MBart50TokenizerFast,
@@ -34,7 +21,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 from transformers.trainer_utils import get_last_checkpoint
-from transformers.utils import check_min_version, is_offline_mode, send_example_telemetry
+from transformers.utils import is_offline_mode
 from transformers.utils.versions import require_version
 from seq2seq_trainer import Seq2SeqTrainer
 
@@ -192,7 +179,7 @@ def main():
         )
     
     if bool(os.environ.get("IS_CONCAT", "False") == "True"):
-        from data_interface_concat.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing
+        raise NotImplementedError("IS_CONCAT == True is unimplemented, at least in this code.")
     else:
         from data_interface.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing
 
@@ -285,134 +272,6 @@ def main():
         label_pad_token_id=label_pad_token_id,
         pad_to_multiple_of=8 if training_args.fp16 else None,
     )
-
-    metric = load_metric(path="metric/sacrebleu.py") if training_args.task == "amr2text" else None
-
-    def compute_metrics_parsing(eval_preds, global_step=0, prefix="val"):
-        prefix = "test" if prefix == "predict" else "val"
-        preds, labels, inputs = eval_preds
-        # print("inputs:", inputs)
-        # print("Pred", preds)
-        # print("labels", labels)
-        if isinstance(preds, tuple):
-            preds = preds[0]
-
-        inputs = np.where(inputs != -100, inputs, tokenizer.pad_token_id)
-        decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
-        # print("decoded_inputs")
-        # print(decoded_inputs)
-        # if data_args.ignore_pad_token_for_loss:
-        #     # Replace -100 in the labels as we can't decode them.
-        #     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        # decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-        os.makedirs(training_args.output_dir + "/val_outputs/", exist_ok=True)
-
-        # gen_graphs = tokenizer.batch_decode(preds, skip_special_tokens=True)
-        # debug_output = f"{training_args.output_dir}/val_outputs/{prefix}_nodes_{global_step}.json"
-
-        # with open(debug_output, 'w', encoding='utf-8') as fout:
-        #     json.dump(gen_graphs, fout, indent=4)
-
-        graphs = []
-        for idx in range(len(preds)):
-            graphs_same_source = []
-            graphs.append(graphs_same_source)
-            ith_pred = preds[idx]
-            ith_pred[0] = tokenizer.bos_token_id
-            ith_pred = [
-                tokenizer.eos_token_id if itm == tokenizer.amr_eos_token_id else itm
-                for itm in ith_pred if itm != tokenizer.pad_token_id
-            ]
-
-            graph, status, (lin, backr) = tokenizer.decode_amr(
-                ith_pred, restore_name_ops=False, prefix=prefix
-            )
-            graph.status = status
-            graph.nodes = lin
-            graph.backreferences = backr
-            graph.tokens = ith_pred
-            graphs_same_source.append(graph)
-
-        graphs_same_source[:] = tuple(
-            zip(*sorted(enumerate(graphs_same_source), key=lambda x: (x[1].status.value, x[0])))
-        )[1]
-        idx = 0
-        assert len(graphs) == len(decoded_inputs), f"inconsistent lenths {len(graphs)} vs {len(decoded_inputs)}"
-        for gps, snt in zip(graphs, decoded_inputs):
-            # print(gps, src)
-            # exit()
-            for gp in gps:
-                # metadata = gg.metadata.copy()
-                metadata = {}
-                metadata["id"] = str(idx)
-                metadata["annotator"] = "bart-amr"
-                # metadata["date"] = str(datetime.datetime.now())
-                metadata["snt"] = snt.replace("<AMR>", '').replace("</AMR>", '').strip()
-                if "save-date" in metadata:
-                    del metadata["save-date"]
-                gp.metadata = metadata
-                idx += 1
-
-        # print("Before Penman Encoding")
-        pieces = [penman.encode(g[0]) for g in graphs]
-        output_prediction_file = f"{training_args.output_dir}/val_outputs/{prefix}_generated_predictions_{global_step}.txt"
-        # write predictions and targets for later rouge evaluation.
-        with open(output_prediction_file, "w") as p_writer:
-            p_writer.write("\n\n".join(pieces))
-
-        try:
-            smatch_score = calculate_smatch(
-                data_args.data_dir + f"/../{prefix}-gold.amr", output_prediction_file
-            )
-        except BaseException as e:
-            print('An exception occurred on calculating smatch')
-            print(e)
-            smatch_score = {"smatch": -42.0}
-
-        result = {"smatch":smatch_score["smatch"]}
-        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
-        result["gen_len"] = np.mean(prediction_lens)
-        result = {k: round(v, 4) for k, v in result.items()}
-        return result
-
-    def compute_metrics_generation(eval_preds, global_step=0, prefix="val"):
-        prefix = "test" if prefix == "predict" else "val"
-        preds, labels, inputs = eval_preds
-        # print("inputs:", inputs)
-        # print("Pred", preds)
-        # print("labels", labels)
-        if isinstance(preds, tuple):
-            preds = preds[0]
-
-        def postprocess_text(preds, labels):
-            preds = [pred.strip() for pred in preds]
-            labels = [[label.strip()] for label in labels]           # sacrebleu uses multi reference setting
-            return preds, labels
-
-        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-        if data_args.ignore_pad_token_for_loss:
-            # Replace -100 in the labels as we can't decode them.
-            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-        # Some simple post-processing
-        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-        result = metric.compute(
-            predictions=decoded_preds, references=decoded_labels, lowercase=True
-        )
-        print(result)
-        result = {"bleu": result["score"]}
-        os.makedirs(training_args.output_dir + "/val_outputs/", exist_ok=True)
-        output_prediction_file = f"{training_args.output_dir}/val_outputs/{prefix}_generated_predictions_{global_step}.txt"
-        with open(output_prediction_file, "w") as p_writer:
-            p_writer.write("\n".join(decoded_preds) + "\n")
-
-        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
-        result["gen_len"] = np.mean(prediction_lens)
-        result = {k: round(v, 4) for k, v in result.items()}
-        return result
     
     training_args.max_target_length = data_args.max_target_length
     if training_args.hub_model_id:
