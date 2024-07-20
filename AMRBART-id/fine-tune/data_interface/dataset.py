@@ -189,6 +189,7 @@ class AMR2TextDataSet(Dataset):
             f"{os.path.dirname(__file__)}/data.py",
             data_files=data_files,
             keep_in_memory=False,
+            trust_remote_code=True
         )
 
     def tokenize_function(self, examples):
