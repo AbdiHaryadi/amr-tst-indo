@@ -1,5 +1,5 @@
 import re
-node_name_matcher = re.compile(r"^[a-z]{1,3}([1-9][0-9]*)?$")
+node_name_matcher = re.compile(r"^[a-z]{1,3}([0-9]+)?$")
 
 def is_node_name(current_token):
     return node_name_matcher.match(current_token) is not None
