@@ -143,7 +143,7 @@ class TextToAMR:
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
             annotator: str | None = None,
-            old_model: bool = False
+            use_prefix: bool = False
     ):
         """
         Initialize `TextToAMR` class.
@@ -158,6 +158,8 @@ class TextToAMR:
         - `logging_at_training_process_level`: If it's `True`, there's a lot of log.
 
         - `annotator`: If it's `None`, the value will be same as `model_name`.
+
+        - `use_prefix`: If it's True, every sentences will be prefixed with `id_ID`. This is for compatibility.
         """
 
         output_dir_parent = f"{root_dir}/outputs"
@@ -225,7 +227,7 @@ class TextToAMR:
         else:
             self.annotator = annotator
 
-        self.old_model = old_model
+        self.use_prefix = use_prefix
 
     def __call__(self, sentences: list[str], method: int = 1) -> list[penman.Graph]:
         """
@@ -234,7 +236,7 @@ class TextToAMR:
         Args:
         - `sentences`: List of sentence.
         """
-        if self.old_model:
+        if self.use_prefix:
             used_sentences = ["id_ID" + x for x in sentences]
         else:
             used_sentences = sentences
