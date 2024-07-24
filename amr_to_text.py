@@ -250,6 +250,8 @@ class AMRToText:
     @staticmethod
     def from_huggingface(repo_id: str, model_name: str, root_dir: str = DEFAULT_ROOT_DIR, hf_kwargs: dict = {}, **kwargs):
         """
+        [DEPRECATED]
+
         Load model from Huggingface. Basically, it uses `huggingface_hub.snapshot_download`. Make sure
         `huggingface_hub` has been installed since it's an optional library.
 
@@ -264,6 +266,8 @@ class AMRToText:
 
         - `kwargs`: Any other arguments that want to be passed for `AMRToText` initialization.
         """
+        print("Warning: This is deprecated. Load manually instead by using this script:\nfrom huggingface_hub import snapshot_download\n\nsnapshot_download(repo_id=repo_id, **hf_kwargs)\nmodel = AMRToText(model_name)")
+
         from huggingface_hub import snapshot_download
         if "local_dir" not in hf_kwargs:
             hf_kwargs["local_dir"] = f"{root_dir}/models"
