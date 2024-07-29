@@ -16,7 +16,7 @@ class AMRTSTDetailedResult:
     target_text: list[str]
 
     def to_list(self) -> list[dict[str, str | list[str]]]:
-        expected_length = len(expected_length)
+        expected_length = len(self.source_text)
         assert (other_length := len(self.source_style)) == expected_length, f"Expecting {expected_length}, got {other_length}"
         assert (other_length := len(self.source_amr)) == expected_length, f"Expecting {expected_length}, got {other_length}"
         assert (other_length := len(self.style_words)) == expected_length, f"Expecting {expected_length}, got {other_length}"
