@@ -67,6 +67,8 @@ class StyleRewriting:
         self.remove_polarity_strategy = remove_polarity_strategy
         self.reset_sense_strategy = reset_sense_strategy
 
+        self.unresolved_words = []
+
     def __call__(
             self,
             text: str,
@@ -109,8 +111,15 @@ class StyleRewriting:
                 new_amr = self._remove_polarity(new_amr, w)
             
             elif self._is_word_consistent_with_node_in_amr(new_amr, w):
-                target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
+                if w in self.unresolved_words:
+                    target_w = None
+                else:
+                    target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
+
                 if target_w is None:
+                    if w not in self.unresolved_words:
+                        self.unresolved_words.append(w)
+
                     if self.ignore_and_warn_if_target_word_not_found:
                         print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
                     else:
