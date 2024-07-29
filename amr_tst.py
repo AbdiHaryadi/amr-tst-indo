@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from style_detector import StyleDetector
 from style_rewriting import StyleRewriting
 from text_to_amr import TextToAMR
+from utils import make_no_metadata_graph
 
 @dataclass
 class AMRTSTDetailedResult:
@@ -24,12 +25,15 @@ class AMRTSTDetailedResult:
 
         data: list[dict[str, str | list[str]]] = []
         for i in range(expected_length):
+            sa = make_no_metadata_graph(self.source_amr[i])
+            ta = make_no_metadata_graph(self.target_amr[i])
+            
             data.append({
                 "source_text": self.source_text[i],
                 "source_style": self.source_style[i],
-                "source_amr": penman.encode(self.source_amr[i], indent=None),
+                "source_amr": penman.encode(sa, indent=None),
                 "style_words": self.style_words[i],
-                "target_amr": penman.encode(self.target_amr[i], indent=None),
+                "target_amr": penman.encode(ta, indent=None),
                 "target_text": self.target_text[i],
             })
 
