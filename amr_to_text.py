@@ -18,9 +18,12 @@ from transformers import (
     AutoConfig,
     MBartTokenizer,
     MBartTokenizerFast,
-    MBartForConditionalGeneration as BartForConditionalGeneration,
+    # MBartForConditionalGeneration as BartForConditionalGeneration,
     set_seed
 )
+
+# This import is temporarily used.
+from modified_modeling_mbart import MBartForConditionalGeneration as BartForConditionalGeneration
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
