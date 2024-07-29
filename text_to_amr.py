@@ -34,7 +34,7 @@ def mkdir_if_not_exists(dir):
     if not os.path.exists(dir):
         os.mkdir(dir)
 
-def prepare_tokenizer_and_model(training_args, model_args, data_args):
+def prepare_tokenizer_and_model(training_args, model_args, data_args, scale_embedding: bool = False):
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
@@ -43,6 +43,7 @@ def prepare_tokenizer_and_model(training_args, model_args, data_args):
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
+        scale_embedding=scale_embedding
     )
 
     tokenizer = AMRBartTokenizer.from_pretrained(
@@ -146,7 +147,8 @@ class TextToAMR:
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
             annotator: str | None = None,
-            use_prefix: bool = False
+            use_prefix: bool = False,
+            scale_embedding: bool = False
     ):
         """
         Initialize `TextToAMR` class.
@@ -163,6 +165,8 @@ class TextToAMR:
         - `annotator`: If it's `None`, the value will be same as `model_name`.
 
         - `use_prefix`: If it's True, every sentences will be prefixed with `id_ID`. This is for compatibility.
+
+        - `scale_embedding`: This is for compatibility.
         """
 
         output_dir_parent = f"{root_dir}/outputs"
@@ -210,7 +214,12 @@ class TextToAMR:
         mkdir_if_not_exists(data_path)
         self.data_args = prepare_data_args(data_path)
 
-        self.tokenizer, self.model = prepare_tokenizer_and_model(self.training_args, self.model_args, self.data_args)
+        self.tokenizer, self.model = prepare_tokenizer_and_model(
+            self.training_args,
+            self.model_args,
+            self.data_args,
+            scale_embedding=scale_embedding
+        )
 
         self.data_collator = DataCollatorForAMRParsing(
             self.tokenizer,
