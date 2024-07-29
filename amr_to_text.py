@@ -1,6 +1,6 @@
 import sys
 
-from utils import to_amr_with_pointer
+from utils import make_no_metadata_graph, to_amr_with_pointer
 sys.path.append("./AMRBART-id/fine-tune")
 
 from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainingArguments
@@ -280,12 +280,7 @@ class AMRToText:
         data_args = self.data_args
         with open(data_args.test_file, encoding="utf-8", mode="w") as fp:
             for g in graphs:
-                no_metadata_g = penman.Graph(
-                    triples=g.triples,
-                    top=g.top,
-                    epidata=g.epidata,
-                    metadata={}
-                )
+                no_metadata_g = make_no_metadata_graph(g)
                 pointer_g = to_amr_with_pointer(penman.encode(no_metadata_g, indent=None))
 
                 # sent is unused, but it's not empty to avoid error
