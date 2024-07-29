@@ -247,6 +247,8 @@ class TextToAMR:
             return self._call_method_2(used_sentences)
         else:
             raise ValueError(f"No method {method}")
+        
+        # TODO: Handle removal of prefix in graphs
 
     def _call_method_1(self, sentences):
         trainer = Seq2SeqTrainer(
