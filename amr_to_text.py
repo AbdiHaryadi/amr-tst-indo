@@ -33,7 +33,7 @@ def mkdir_if_not_exists(dir):
     if not os.path.exists(dir):
         os.mkdir(dir)
 
-def prepare_tokenizer_and_model(training_args, model_args, data_args):
+def prepare_tokenizer_and_model(training_args, model_args, data_args, scale_embedding: bool = False):
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
@@ -42,6 +42,7 @@ def prepare_tokenizer_and_model(training_args, model_args, data_args):
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
+        scale_embedding=scale_embedding
     )
 
     tokenizer = AMRBartTokenizer.from_pretrained(
