@@ -126,11 +126,9 @@ class AMRBartTokenizer(MBart50Tokenizer):
                 elif is_rel:
                     bpe_toks = [self.INIT + ':'] + self._tok_bpe(tokk[1:])
                 else:
-                    print("tok:", tokk)
-                    print(
-                        f"is_rel:{is_rel}, is_spc:{is_spc}, is_frame:{is_frame}, is_of:{is_of}")
-                    exit()
-                    raise
+                    raise NotImplementedError(
+                        f"Cannot handle for this case:\ntok:{tokk}, is_rel:{is_rel}, is_spc:{is_spc}, is_frame:{is_frame}, is_of:{is_of}"
+                    )
             else:
                 if is_in_enc:
                     bpe_toks = [self.INIT + tokk]
