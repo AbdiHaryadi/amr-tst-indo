@@ -66,11 +66,16 @@ class AMRTST:
         self.sr = sr
         self.a2t = a2t
 
+        self.last_source_graphs = []
+        self.last_style_words_list = []
+        self.last_rewritten_graphs = []
+        self.last_target_texts = []
+
     def __call__(
             self,
             texts: list[str],
             source_styles: list[str],
-            precomputed_graphs: Optional[list[penman.Graph]] = None 
+            precomputed_graphs: Optional[list[penman.Graph]] = None
     ):
         number_of_data = len(texts)
         assert len(source_styles) == number_of_data
@@ -79,9 +84,13 @@ class AMRTST:
         else:
             assert len(precomputed_graphs) == number_of_data
             graphs = precomputed_graphs
+        self.last_source_graphs = graphs
 
-        style_words_list: list[list[str]] = []
-        rewritten_graphs: list[penman.Graph] = []
+        self.last_style_words_list = []
+        style_words_list: list[list[str]] = self.last_style_words_list
+
+        self.last_rewritten_graphs = []
+        rewritten_graphs: list[penman.Graph] = self.last_rewritten_graphs
 
         for t, g, s in tqdm(zip(texts, graphs, source_styles), total=number_of_data):
             try:
@@ -98,7 +107,13 @@ class AMRTST:
                 g_tgt = BACKOFF
             rewritten_graphs.append(g_tgt)
 
-        target_texts = self.a2t(rewritten_graphs)
+        try:
+            target_texts = self.a2t(rewritten_graphs)
+        except Exception as e:
+            print(f"Warning: Can't process all of the target graphs for AMR generation.\nError: {e}")
+            target_texts = ["" for _ in rewritten_graphs]
+        self.last_target_texts = target_texts
+
         return target_texts, AMRTSTDetailedResult(
             source_text=texts,
             source_style=source_styles,
