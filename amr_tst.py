@@ -6,6 +6,7 @@ from style_rewriting import StyleRewriting
 from text_to_amr import TextToAMR
 from utils import make_no_metadata_graph
 from tqdm import tqdm
+from typing import Optional
 
 BACKOFF = penman.Graph(
     [
@@ -65,14 +66,24 @@ class AMRTST:
         self.sr = sr
         self.a2t = a2t
 
-    def __call__(self, texts: list[str], source_styles: list[str]):
-        assert len(texts) == len(source_styles)
-        graphs = self.t2a(texts)
+    def __call__(
+            self,
+            texts: list[str],
+            source_styles: list[str],
+            precomputed_graphs: Optional[list[penman.Graph]] = None 
+    ):
+        number_of_data = len(texts)
+        assert len(source_styles) == number_of_data
+        if precomputed_graphs is None:
+            graphs = self.t2a(texts)
+        else:
+            assert len(precomputed_graphs) == number_of_data
+            graphs = precomputed_graphs
 
         style_words_list: list[list[str]] = []
         rewritten_graphs: list[penman.Graph] = []
 
-        for t, g, s in tqdm(zip(texts, graphs, source_styles), total=len(texts)):
+        for t, g, s in tqdm(zip(texts, graphs, source_styles), total=number_of_data):
             try:
                 current_style_words = self.sd(t)
             except Exception as e:
