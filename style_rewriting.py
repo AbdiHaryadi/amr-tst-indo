@@ -268,11 +268,11 @@ class StyleRewriting:
         for var, rel, instance in amr.triples:
             if rel == ":instance":
                 if self._is_word_consistent_with_instance(source_word, instance):
-                    new_amr = self._remove_polarity_at_var(new_amr, var)
+                    new_amr = self._remove_polarity_at_var_if_exists(new_amr, var)
 
         return new_amr
     
-    def _remove_polarity_at_var(self, amr: penman.Graph, selected_var: str):
+    def _remove_polarity_at_var_if_exists(self, amr: penman.Graph, selected_var: str):
         new_triples = []
         new_epidata = {}
 
@@ -292,10 +292,7 @@ class StyleRewriting:
             new_triples.append(t)
             new_epidata[t] = op
             prev_t = t
-
-        if not found:
-            raise ValueError(f"Cannot found an instance from \"{selected_var}\"")
-
+        
         return penman.Graph(triples=new_triples, top=amr.top, epidata=new_epidata, metadata=amr.metadata)
     
     def _rewrite_amr_nodes(self, amr: penman.Graph, source_word: str, target_word: str):
