@@ -35,7 +35,6 @@ from transformers import (
     Trainer    
 )
 
-from sklearn.metrics import accuracy_score
 from transformers.trainer_utils import get_last_checkpoint
 
 logger = logging.getLogger(__name__)
