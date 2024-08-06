@@ -306,6 +306,7 @@ class StyleRewriting:
                 if var == selected_var and rel == ":instance":
                     new_instance = instance.replace("-", " ")
                     new_instance = new_instance.replace(source_word, target_word)
+                    new_instance = new_instance.replace("_", " ")
                     new_instance = new_instance.replace(" ", "-")
                     if self.reset_sense_strategy and self._is_frame(new_instance):
                         new_instance = new_instance[:-3] + "-00"
