@@ -16,12 +16,9 @@ from transformers import (
     AutoConfig,
     MBartTokenizer,
     MBartTokenizerFast,
-    # MBartForConditionalGeneration as BartForConditionalGeneration,
+    MBartForConditionalGeneration as BartForConditionalGeneration,
     set_seed
 )
-
-# This import is temporarily used.
-from  modified_modeling_mbart import MBartForConditionalGeneration as BartForConditionalGeneration
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -34,7 +31,7 @@ def mkdir_if_not_exists(dir):
     if not os.path.exists(dir):
         os.mkdir(dir)
 
-def prepare_tokenizer_and_model(training_args, model_args, data_args, scale_embedding: bool = False):
+def prepare_tokenizer_and_model(training_args, model_args, data_args):
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
@@ -42,8 +39,7 @@ def prepare_tokenizer_and_model(training_args, model_args, data_args, scale_embe
         model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-        scale_embedding=scale_embedding
+        use_auth_token=True if model_args.use_auth_token else None
     )
 
     tokenizer = AMRBartTokenizer.from_pretrained(
@@ -147,8 +143,7 @@ class TextToAMR:
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
             annotator: str | None = None,
-            use_prefix: bool = False,
-            scale_embedding: bool = False
+            use_prefix: bool = False
     ):
         """
         Initialize `TextToAMR` class.
@@ -217,8 +212,7 @@ class TextToAMR:
         self.tokenizer, self.model = prepare_tokenizer_and_model(
             self.training_args,
             self.model_args,
-            self.data_args,
-            scale_embedding=scale_embedding
+            self.data_args
         )
 
         self.data_collator = DataCollatorForAMRParsing(
