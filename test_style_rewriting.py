@@ -1,4 +1,4 @@
-from style_rewriting import StyleRewriting
+from style_rewriting import StyleRewriting, TextBasedStyleRewriting
 import penman
 
 def test_handle_target_word_with_underscore():
@@ -22,3 +22,23 @@ def test_handle_target_word_with_underscore():
     style_words = ["sedikit"]
     result = sr(text, graph, source_style, style_words)
     assert "_" not in penman.encode(result)
+
+def test_text_based_style_rewriting():
+    # Di tes ini, diberikan text string, kembalikan string juga, dan pastikan hasilnya beda, dan melibatkan kata yang dimaksud. Pastikan ada "besar hati" di outputnya.
+    class DummyTextBasedStyleRewriting(TextBasedStyleRewriting):
+        def __init__(self):
+            self.max_score_strategy = False
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            if word == "sedikit":
+                return ["besar_hati"]
+            else:
+                raise NotImplementedError
+    
+    sr = DummyTextBasedStyleRewriting()
+    text = "saya meminta thai hot dan mendapatkan rempah yang sangat sedikit."
+    source_style = "LABEL_0"
+    style_words = ["sedikit"]
+    result = sr(text, source_style, style_words)
+    assert result == "saya meminta thai hot dan mendapatkan rempah yang sangat besar hati."

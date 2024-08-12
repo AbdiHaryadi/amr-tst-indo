@@ -325,3 +325,204 @@ class StyleRewriting:
             raise ValueError(f"Cannot found an instance from \"{selected_var}\"")
 
         return penman.Graph(triples=new_triples, top=amr.top, epidata=new_epidata, metadata=amr.metadata)
+
+class TextBasedStyleRewriting:
+    """
+    Class like `StyleRewriting`, but with text only; no AMR required.
+    """
+
+    def __init__(
+            self,
+            style_clf_hf_checkpoint: str,
+            fasttext_model_path: str,
+            *,
+            lang: str = "ind",
+            word_expand_size: int = 10,
+            ignore_and_warn_if_target_word_not_found: bool = True,
+            max_score_strategy: bool = False
+    ):
+        """
+        Initialize `TextBasedStyleRewriting` class.
+
+        Args:
+        - `style_clf_hf_checkpoint`: The Huggingface checkpoint for style
+        classifier. The checkpoint should support `text-classification`
+        pipeline.
+
+        - `fasttext_model_path`: The Fasttext model path, trained from
+        [Fasttext library](https://fasttext.cc/).
+
+        - `word_expand_size`: Number of words expanded from Fasttext in the case
+        of no antonym from WordNet. The default value is 10.
+
+        - `lang`: Supported language. Indonesia (`ind`) is the default.
+
+        - `ignore_and_warn_if_target word_not_found`: Default to `True`.
+
+        - `max_score_strategy`: Default to `False`. If it's `True`, for the case
+        of multiple valid target words, instead of returning the first word like
+        in the original paper, the classifier takes into account so the returned
+        word has the maximum score.
+        """
+
+        self.clf_pipe = pipeline("text-classification", model=style_clf_hf_checkpoint)
+        self.fasttext_model = fasttext.load_model(fasttext_model_path)
+        self.word_expand_size = word_expand_size
+        self.lang = lang
+        self.ignore_and_warn_if_target_word_not_found = ignore_and_warn_if_target_word_not_found
+        self.max_score_strategy = max_score_strategy
+
+    def __call__(
+            self,
+            text: str,
+            source_style: str,
+            style_words: list[str],
+            verbose: bool = False
+    ):
+        """
+        Rewrite text based on source style and style words.
+
+        Args:
+        - `text`: The involved text which used for generating `amr`.
+
+        - `source_style`: The source style of text. It is dependent to
+        `style_clf_hf_checkpoint`.
+        For example, in
+        [this model](abdiharyadi/roberta-base-indonesian-522M-with-sa-william-dataset),
+        negative sentiment is called `LABEL_0`, and positive sentiment is called
+        `LABEL_1`.
+
+        - `style_words`: The identified style words from `text`.
+
+        - `verbose`: Print step information for debugging purpose. Default to
+        `False`.
+        """
+
+        text_without_style_words = self._get_text_without_style_words(text, style_words)
+
+        new_text = text
+        handled_style_words = []
+
+        for w in style_words:
+            if w in handled_style_words:
+                continue
+
+            if w in new_text:
+                target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
+                if target_w is None:
+                    if self.ignore_and_warn_if_target_word_not_found:
+                        print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
+                    else:
+                        raise NotImplementedError(f"For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}.")
+                else:
+                    new_text = self._rewrite_text(new_text, w, target_w)
+
+            handled_style_words.append(w)
+            
+        return new_text
+
+    def _get_antonym_list(self, word: str):
+        main_synsets = wn.synsets(word, lang=self.lang)
+        main_lemma_list = []
+        for ss in main_synsets:
+            for l in ss.lemmas():
+                if l in main_lemma_list:
+                    continue
+
+                main_lemma_list.append(l)
+
+        antonym_list = []
+        for l in main_lemma_list:
+            for a in l.antonyms():
+                for ln in a.synset().lemma_names(lang=self.lang):
+                    if ln in antonym_list:
+                        continue
+
+                    antonym_list.append(ln)
+
+        return antonym_list
+
+    def _get_target_style_word(self, source_style: str, style_word: str, text_without_style_words: str, verbose: bool):
+        tried_style_word_set = set()
+        style_word_list = [style_word]
+        while len(style_word_list) > 0:
+            antonym_list = []
+
+            for current_style_word in style_word_list:
+                current_antonym_list = self._get_antonym_list(current_style_word)
+                if verbose:
+                    print(f"{current_style_word=}")
+                    print(f"{current_antonym_list=}")
+
+                for a in current_antonym_list:
+                    modified_a = a.replace("_", " ")
+                    if modified_a not in antonym_list:
+                        antonym_list.append(modified_a)
+
+                tried_style_word_set.add(current_style_word)
+
+            if verbose:
+                print(f"{style_word_list=}")
+                print(f"{antonym_list=}")
+                
+            max_score = 0.0
+            chosen_a = None
+            for a in antonym_list:
+                x_tmp = text_without_style_words + " " + a
+                pipe_result, *_ = self.clf_pipe(x_tmp)
+                if verbose:
+                    print(f"{x_tmp=}")
+                    print(f"{pipe_result=}")
+
+                if pipe_result["label"] != source_style:
+                    if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
+                        chosen_a = a
+                        if not self.max_score_strategy:
+                            break
+
+                        max_score = pipe_result["score"]
+
+            # All antonym_list element has been iterated
+            if chosen_a is not None:
+                return chosen_a
+            # else: expand the words
+
+            new_style_word_list = []
+            for current_style_word in style_word_list:
+                fasttext_result = self.fasttext_model.get_nearest_neighbors(current_style_word, k=self.word_expand_size)
+                if verbose:
+                    print(f"{current_style_word=}")
+                    print(f"{fasttext_result=}")
+
+                for _, new_style_word in fasttext_result:
+                    if new_style_word not in tried_style_word_set:
+                        new_style_word_list.append(new_style_word)
+
+            if verbose:
+                print(f"{tried_style_word_set=}")
+                print(f"{new_style_word_list=}")
+
+            style_word_list = new_style_word_list
+
+        return None
+
+    def _get_text_without_style_words(self, text: str, style_words: list[str]):
+        ss_tokens = text.split(" ")
+        new_ss_tokens = []
+
+        for t in ss_tokens:
+            new_t = t
+            for w in style_words:
+                new_t = new_t.replace(w, "")
+            
+            new_t = new_t.strip()
+            if new_t != "":
+                new_ss_tokens.append(new_t)
+
+        return " ".join(new_ss_tokens)
+    
+    def _rewrite_text(self, text: str, source_word: str, target_word: str):
+        if any(c in source_word for c in r"[]\.^$*+?{}|()"):
+            print(f"Warning: Source word ({source_word}) contains regex metacharacter. It may rewrite text incorrectly!")
+
+        return re.sub(rf"\b({source_word})\b", target_word, text)
