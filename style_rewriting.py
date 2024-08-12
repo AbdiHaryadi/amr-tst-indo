@@ -6,7 +6,7 @@ import fasttext
 from nltk.corpus import wordnet as wn
 import penman
 import re
-from transformers import pipeline
+from transformers import pipeline, TextClassificationPipeline
 
 class StyleRewriting:
     """
@@ -15,7 +15,7 @@ class StyleRewriting:
 
     def __init__(
             self,
-            style_clf_hf_checkpoint: str,
+            clf_pipeline: TextClassificationPipeline | str,
             fasttext_model_path: str,
             *,
             lang: str = "ind",
@@ -29,9 +29,9 @@ class StyleRewriting:
         Initialize `StyleRewriting` class.
 
         Args:
-        - `style_clf_hf_checkpoint`: The Huggingface checkpoint for style
-        classifier. The checkpoint should support `text-classification`
-        pipeline.
+        - `clf_pipeline`: Pipeline for style classification. If it's a string,
+        it should be a Huggingface checkpoint for style classifier. The
+        checkpoint should support `text-classification` pipeline.
 
         - `fasttext_model_path`: The Fasttext model path, trained from
         [Fasttext library](https://fasttext.cc/).
@@ -58,7 +58,11 @@ class StyleRewriting:
         same as source sense number.
         """
 
-        self.clf_pipe = pipeline("text-classification", model=style_clf_hf_checkpoint)
+        if isinstance(clf_pipeline, str):
+            self.clf_pipe = pipeline("text-classification", model=clf_pipeline)
+        else:
+            self.clf_pipe = clf_pipeline
+        
         self.fasttext_model = fasttext.load_model(fasttext_model_path)
         self.word_expand_size = word_expand_size
         self.lang = lang
@@ -169,18 +173,24 @@ class StyleRewriting:
             chosen_a = None
             for a in antonym_list:
                 x_tmp = text_without_style_words + " " + a
-                pipe_result, *_ = self.clf_pipe(x_tmp)
-                if verbose:
-                    print(f"{x_tmp=}")
-                    print(f"{pipe_result=}")
+                try:
+                    pipe_result, *_ = self.clf_pipe(x_tmp)
+                    if verbose:
+                        print(f"{x_tmp=}")
+                        print(f"{pipe_result=}")
 
-                if pipe_result["label"] != source_style:
-                    if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
-                        chosen_a = a
-                        if not self.max_score_strategy:
-                            break
+                    if pipe_result["label"] != source_style:
+                        if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
+                            chosen_a = a
+                            if not self.max_score_strategy:
+                                break
 
-                        max_score = pipe_result["score"]
+                            max_score = pipe_result["score"]
+                    
+                except Exception as e:
+                    print(f"Error when processing \"{x_tmp}\"!\n{e}. Because of that, {a} is chosen as valid target style word.")
+                    chosen_a = a
+                    break
 
             # All antonym_list element has been iterated
             if chosen_a is not None:
@@ -333,7 +343,7 @@ class TextBasedStyleRewriting:
 
     def __init__(
             self,
-            style_clf_hf_checkpoint: str,
+            clf_pipeline: TextClassificationPipeline | str,
             fasttext_model_path: str,
             *,
             lang: str = "ind",
@@ -345,9 +355,9 @@ class TextBasedStyleRewriting:
         Initialize `TextBasedStyleRewriting` class.
 
         Args:
-        - `style_clf_hf_checkpoint`: The Huggingface checkpoint for style
-        classifier. The checkpoint should support `text-classification`
-        pipeline.
+        - `clf_pipeline`: Pipeline for style classification. If it's a string,
+        it should be a Huggingface checkpoint for style classifier. The
+        checkpoint should support `text-classification` pipeline.
 
         - `fasttext_model_path`: The Fasttext model path, trained from
         [Fasttext library](https://fasttext.cc/).
@@ -365,7 +375,11 @@ class TextBasedStyleRewriting:
         word has the maximum score.
         """
 
-        self.clf_pipe = pipeline("text-classification", model=style_clf_hf_checkpoint)
+        if isinstance(clf_pipeline, str):
+            self.clf_pipe = pipeline("text-classification", model=clf_pipeline)
+        else:
+            self.clf_pipe = clf_pipeline
+        
         self.fasttext_model = fasttext.load_model(fasttext_model_path)
         self.word_expand_size = word_expand_size
         self.lang = lang
@@ -469,18 +483,24 @@ class TextBasedStyleRewriting:
             chosen_a = None
             for a in antonym_list:
                 x_tmp = text_without_style_words + " " + a
-                pipe_result, *_ = self.clf_pipe(x_tmp)
-                if verbose:
-                    print(f"{x_tmp=}")
-                    print(f"{pipe_result=}")
+                try:
+                    pipe_result, *_ = self.clf_pipe(x_tmp)
+                    if verbose:
+                        print(f"{x_tmp=}")
+                        print(f"{pipe_result=}")
 
-                if pipe_result["label"] != source_style:
-                    if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
-                        chosen_a = a
-                        if not self.max_score_strategy:
-                            break
+                    if pipe_result["label"] != source_style:
+                        if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
+                            chosen_a = a
+                            if not self.max_score_strategy:
+                                break
 
-                        max_score = pipe_result["score"]
+                            max_score = pipe_result["score"]
+                    
+                except Exception as e:
+                    print(f"Error when processing \"{x_tmp}\"!\n{e}. Because of that, {a} is chosen as valid target style word.")
+                    chosen_a = a
+                    break
 
             # All antonym_list element has been iterated
             if chosen_a is not None:
