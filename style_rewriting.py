@@ -188,7 +188,7 @@ class StyleRewriting:
                             max_score = pipe_result["score"]
                     
                 except Exception as e:
-                    print(f"Error when processing \"{x_tmp}\"!\n{e}. Because of that, {a} is chosen as valid target style word.")
+                    print(f"Error when processing \"{x_tmp}\"!\nError: {e}\nBecause of that, {a} is chosen as valid target style word.")
                     chosen_a = a
                     break
 
@@ -386,6 +386,8 @@ class TextBasedStyleRewriting:
         self.ignore_and_warn_if_target_word_not_found = ignore_and_warn_if_target_word_not_found
         self.max_score_strategy = max_score_strategy
 
+        self.last_log = []
+
     def __call__(
             self,
             text: str,
@@ -412,6 +414,8 @@ class TextBasedStyleRewriting:
         `False`.
         """
 
+        self.last_log = []
+
         text_without_style_words = self._get_text_without_style_words(text, style_words)
 
         new_text = text
@@ -426,6 +430,12 @@ class TextBasedStyleRewriting:
                 if target_w is None:
                     if self.ignore_and_warn_if_target_word_not_found:
                         print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
+                        self.last_log.append({
+                            "type": "target_word_not_found",
+                            "text": text,
+                            "source_style": source_style,
+                            "word": w
+                        })
                     else:
                         raise NotImplementedError(f"For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}.")
                 else:
@@ -467,6 +477,11 @@ class TextBasedStyleRewriting:
                 if verbose:
                     print(f"{current_style_word=}")
                     print(f"{current_antonym_list=}")
+                self.last_log.append({
+                    "type": "get_antonyms",
+                    "word": current_style_word,
+                    "antonyms": current_antonym_list
+                })
 
                 for a in current_antonym_list:
                     modified_a = a.replace("_", " ")
@@ -488,6 +503,10 @@ class TextBasedStyleRewriting:
                     if verbose:
                         print(f"{x_tmp=}")
                         print(f"{pipe_result=}")
+                    self.last_log.append({
+                        "type": "check_style",
+                        "text": x_tmp
+                    } | pipe_result)
 
                     if pipe_result["label"] != source_style:
                         if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
@@ -498,7 +517,7 @@ class TextBasedStyleRewriting:
                             max_score = pipe_result["score"]
                     
                 except Exception as e:
-                    print(f"Error when processing \"{x_tmp}\"!\n{e}. Because of that, {a} is chosen as valid target style word.")
+                    print(f"Error when processing \"{x_tmp}\"!\nError: {e}\nBecause of that, {a} is chosen as valid target style word.")
                     chosen_a = a
                     break
 
@@ -521,6 +540,12 @@ class TextBasedStyleRewriting:
             if verbose:
                 print(f"{tried_style_word_set=}")
                 print(f"{new_style_word_list=}")
+
+            self.last_log.append({
+                "type": "expand",
+                "old_words": style_word_list,
+                "new_words": new_style_word_list
+            })
 
             style_word_list = new_style_word_list
 
@@ -546,3 +571,6 @@ class TextBasedStyleRewriting:
             print(f"Warning: Source word ({source_word}) contains regex metacharacter. It may rewrite text incorrectly!")
 
         return re.sub(rf"\b({source_word})\b", target_word, text)
+    
+    def get_last_log(self):
+        return self.last_log
