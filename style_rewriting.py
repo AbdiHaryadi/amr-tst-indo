@@ -71,6 +71,8 @@ class StyleRewriting:
         self.remove_polarity_strategy = remove_polarity_strategy
         self.reset_sense_strategy = reset_sense_strategy
 
+        self.last_log = []
+
     def __call__(
             self,
             text: str,
@@ -100,6 +102,8 @@ class StyleRewriting:
         `False`.
         """
 
+        self.last_log = []
+
         text_without_style_words = self._get_text_without_style_words(text, style_words)
 
         new_amr = amr
@@ -117,10 +121,22 @@ class StyleRewriting:
                 if target_w is None:
                     if self.ignore_and_warn_if_target_word_not_found:
                         print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
+                        self.last_log.append({
+                            "type": "target_word_not_found",
+                            "text": text,
+                            "source_style": source_style,
+                            "word": w
+                        })
                     else:
                         raise NotImplementedError(f"For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}.")
                 else:
+                    prev_amr_str = penman.encode(new_amr, indent=None)
                     new_amr = self._rewrite_amr_nodes(new_amr, w, target_w)
+                    self.last_log.append({
+                        "type": "rewrite_node",
+                        "old_amr": prev_amr_str,
+                        "new_amr": penman.encode(new_amr, indent=None)
+                    })
 
             handled_style_words.append(w)
             
@@ -159,6 +175,12 @@ class StyleRewriting:
                     print(f"{current_style_word=}")
                     print(f"{current_antonym_list=}")
 
+                self.last_log.append({
+                    "type": "get_antonyms",
+                    "word": current_style_word,
+                    "antonyms": current_antonym_list
+                })
+
                 for a in current_antonym_list:
                     if a not in antonym_list:
                         antonym_list.append(a)
@@ -178,6 +200,11 @@ class StyleRewriting:
                     if verbose:
                         print(f"{x_tmp=}")
                         print(f"{pipe_result=}")
+                    
+                    self.last_log.append({
+                        "type": "check_style",
+                        "text": x_tmp
+                    } | pipe_result)
 
                     if pipe_result["label"] != source_style:
                         if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
@@ -211,6 +238,12 @@ class StyleRewriting:
             if verbose:
                 print(f"{tried_style_word_set=}")
                 print(f"{new_style_word_list=}")
+
+            self.last_log.append({
+                "type": "expand",
+                "old_words": style_word_list,
+                "new_words": new_style_word_list
+            })
 
             style_word_list = new_style_word_list
 
@@ -335,6 +368,9 @@ class StyleRewriting:
             raise ValueError(f"Cannot found an instance from \"{selected_var}\"")
 
         return penman.Graph(triples=new_triples, top=amr.top, epidata=new_epidata, metadata=amr.metadata)
+    
+    def get_last_log(self):
+        return self.last_log
 
 class TextBasedStyleRewriting:
     """
