@@ -6,6 +6,7 @@ import fasttext
 from nltk.corpus import wordnet as wn
 import penman
 import re
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from transformers import pipeline, TextClassificationPipeline
 
 class StyleRewriting:
@@ -23,7 +24,8 @@ class StyleRewriting:
             ignore_and_warn_if_target_word_not_found: bool = True,
             max_score_strategy: bool = False,
             remove_polarity_strategy: bool = True,
-            reset_sense_strategy: bool = True
+            reset_sense_strategy: bool = True,
+            use_stem: bool = True
     ):
         """
         Initialize `StyleRewriting` class.
@@ -56,22 +58,35 @@ class StyleRewriting:
         consisted to style words, it will rewrite to the new AMR frame with
         `-00` sense number. If the value is `False`, the target sense number is
         same as source sense number.
+
+        - `use_stem`: Default to `True`. If it's `True`, a word and an instance
+        need to be stemmed before checking the exact match consistency.
         """
 
-        if isinstance(clf_pipeline, str):
-            self.clf_pipe = pipeline("text-classification", model=clf_pipeline)
-        else:
-            self.clf_pipe = clf_pipeline
-        
-        self.fasttext_model = fasttext.load_model(fasttext_model_path)
+        self._load_clf_pipeline(clf_pipeline)
+        self._load_fasttext_model(fasttext_model_path)
+
         self.word_expand_size = word_expand_size
         self.lang = lang
         self.ignore_and_warn_if_target_word_not_found = ignore_and_warn_if_target_word_not_found
         self.max_score_strategy = max_score_strategy
         self.remove_polarity_strategy = remove_polarity_strategy
         self.reset_sense_strategy = reset_sense_strategy
+        if use_stem:
+            self.stemmer = StemmerFactory().create_stemmer()
+        else:
+            self.stemmer = None
 
         self.last_log = []
+
+    def _load_fasttext_model(self, fasttext_model_path):
+        self.fasttext_model = fasttext.load_model(fasttext_model_path)
+
+    def _load_clf_pipeline(self, clf_pipeline):
+        if isinstance(clf_pipeline, str):
+            self.clf_pipe = pipeline("text-classification", model=clf_pipeline)
+        else:
+            self.clf_pipe = clf_pipeline
 
     def __call__(
             self,
@@ -287,6 +302,24 @@ class StyleRewriting:
         return False
 
     def _is_word_consistent_with_instance(self, word: str, instance: str):
+        if self.stemmer is None:
+            return self._is_word_consistent_with_instance_without_stem(word, instance)
+        else:
+            mod_word = self._clean_and_stem(word)
+            mod_instance = instance
+            if self._is_frame(mod_instance):
+                mod_instance = mod_instance[:-3]
+            mod_instance  = self._clean_and_stem(mod_instance)
+
+            return mod_word == mod_instance
+
+    def _clean_and_stem(self, word):
+        assert self.stemmer is not None
+        mod_word = "".join((c if c in "abcdefghijklmnopqrstuvwxyz" else " ") for c in word)
+        mod_word = " ".join(mod_word.split())
+        return self.stemmer.stem(mod_word)
+    
+    def _is_word_consistent_with_instance_without_stem(self, word: str, instance: str):
         mod_word = word.replace(" ", "-")
         if self._is_frame(instance):
             if mod_word == instance[:-3]:

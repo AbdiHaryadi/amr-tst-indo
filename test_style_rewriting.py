@@ -1,12 +1,16 @@
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from style_rewriting import StyleRewriting, TextBasedStyleRewriting
 import penman
 
 def test_handle_target_word_with_underscore():
     class DummyStyleRewriting(StyleRewriting):
         def __init__(self):
-            self.remove_polarity_strategy = True
-            self.max_score_strategy = False
-            self.reset_sense_strategy = True
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path")
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
             self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
 
         def _get_antonym_list(self, word: str):
@@ -46,10 +50,12 @@ def test_text_based_style_rewriting():
 def test_style_rewriting_when_clf_error():
     class DummyStyleRewriting(StyleRewriting):
         def __init__(self):
-            self.remove_polarity_strategy = True
-            self.max_score_strategy = False
-            self.reset_sense_strategy = True
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path")
 
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
             def trigger_error():
                 raise ValueError("This error is expected.")
             
@@ -215,20 +221,19 @@ def test_style_rewriting_get_last_log():
             pass
 
         def get_nearest_neighbors(self, word, k):
-            assert k == 5
             if word == "buruk":
                 return [(None, "buruk2")]
             else:
                 return []
-
+    
     class DummyStyleRewriting(StyleRewriting):
         def __init__(self):
-            self.remove_polarity_strategy = False # <- To ignore polarity handling
-            self.word_expand_size = 5
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path", remove_polarity_strategy=False)
+
+        def _load_fasttext_model(self, fasttext_model_path):
             self.fasttext_model = DummyFastTextModel()
-            self.max_score_strategy = False
-            self.reset_sense_strategy = True
-            self.ignore_and_warn_if_target_word_not_found = True
+
+        def _load_clf_pipeline(self, clf_pipeline):
             self.clf_pipe = lambda x: dummy_clf_pipe_fn(x)
 
         def _get_antonym_list(self, word: str):
@@ -319,3 +324,53 @@ def test_style_rewriting_get_last_log():
         "new_amr": penman.encode(penman.decode(amr_str.replace("bagus-00", "kataketiga-00")), indent=None)
     }
     assert len(log) == 11
+
+def test_style_rewriting_use_sastrawi_for_node_match():
+    stemmer = StemmerFactory().create_stemmer()
+    assert stemmer.stem("mendatangi") == stemmer.stem("datang")
+
+    class DummyStyleRewriting(StyleRewriting):
+        def __init__(self):
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path")
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            raise NotImplementedError("You should only use polarity check, right?")
+
+    sr = DummyStyleRewriting()
+    text = "saya tidak akan datang ke salon ini lagi."
+    graph = penman.decode("(z0 / mendatangi-01 :polarity - :ARG1 (z1 / aku) :ARG4 (z2 / salon :mod (z3 / ini)) :mod (z4 / lagi))")
+    source_style = "LABEL_0"
+    style_words = ["datang"]
+    result = sr(text, graph, source_style, style_words)
+    assert penman.encode(result, indent=None) == penman.encode(
+        penman.decode("(z0 / mendatangi-01 :ARG1 (z1 / aku) :ARG4 (z2 / salon :mod (z3 / ini)) :mod (z4 / lagi))"),
+        indent=None
+    )
+
+def test_style_rewriting_not_use_sastrawi_for_node_match():
+    class DummyStyleRewriting(StyleRewriting):
+        def __init__(self):
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path", use_stem=False)
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            raise NotImplementedError("No match, right?")
+
+    sr = DummyStyleRewriting()
+    text = "saya tidak akan datang ke salon ini lagi."
+    graph = penman.decode("(z0 / mendatangi-01 :polarity - :ARG1 (z1 / aku) :ARG4 (z2 / salon :mod (z3 / ini)) :mod (z4 / lagi))")
+    source_style = "LABEL_0"
+    style_words = ["datang"]
+    result = sr(text, graph, source_style, style_words)
+    assert penman.encode(result, indent=None) == penman.encode(graph, indent=None)
