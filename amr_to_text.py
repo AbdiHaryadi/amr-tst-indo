@@ -144,6 +144,7 @@ class AMRToText:
             root_dir: str = DEFAULT_ROOT_DIR,
             dataset: str = "wrete",
             logging_at_training_process_level: bool = False,
+            no_tqdm: bool = True,
     ):
         """
         Initialize `AMRToText` class.
@@ -156,6 +157,8 @@ class AMRToText:
         - `dataset`: Name of folder which contains `inference.json` that will be used for test dataset.
 
         - `logging_at_training_process_level`: If it's `True`, there's a lot of log.
+
+        - `no_tqdm`: If it's `True`, it will disable (or reduce) TQDM progress bar.
         """
 
         output_dir_parent = f"{root_dir}/outputs"
@@ -182,6 +185,8 @@ class AMRToText:
             task="amr2text",
             generation_max_length=384,
             generation_num_beams=5,
+
+            disable_tqdm=no_tqdm,
 
             # Issue: Do we really need this?
             per_device_eval_batch_size=batch_size,
@@ -212,6 +217,11 @@ class AMRToText:
         )
 
         self.model_name = model_name
+
+        if no_tqdm:
+            datasets.disable_progress_bars()
+        else:
+            datasets.enable_progress_bars()
 
     def __call__(self, graphs: list[penman.Graph]) -> list[str]:
         """
