@@ -77,7 +77,7 @@ class StyleRewriting:
         else:
             self.stemmer = None
 
-        self.last_log = []
+        self.last_log: list[dict[str]] = []
 
     def _load_fasttext_model(self, fasttext_model_path):
         self.fasttext_model = fasttext.load_model(fasttext_model_path)
