@@ -374,3 +374,96 @@ def test_style_rewriting_not_use_sastrawi_for_node_match():
     style_words = ["datang"]
     result = sr(text, graph, source_style, style_words)
     assert penman.encode(result, indent=None) == penman.encode(graph, indent=None)
+
+def test_style_rewriting_replace_instance():
+    stemmer = StemmerFactory().create_stemmer()
+    assert stemmer.stem("memburuk") == stemmer.stem("buruk")
+
+    class DummyStyleRewriting(StyleRewriting):
+        def __init__(self):
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path")
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            if word == "memburuk":
+                return ["bersih"]
+            else:
+                raise NotImplementedError(f"Unexpected word \"{word}\" in _get_antonym_list")
+
+    sr = DummyStyleRewriting()
+    text = "semenjak joes berganti kepemilikan, kondisinya semakin memburuk."
+    graph = penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / buruk-07 :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))""")
+    source_style = "LABEL_0"
+    style_words = ["memburuk"]
+    result = sr(text, graph, source_style, style_words)
+    assert penman.encode(result, indent=None) == penman.encode(
+        penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / bersih-00 :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))"""),
+        indent=None
+    )
+
+def test_style_rewriting_replace_instance_without_reset_sense():
+    stemmer = StemmerFactory().create_stemmer()
+    assert stemmer.stem("memburuk") == stemmer.stem("buruk")
+
+    class DummyStyleRewriting(StyleRewriting):
+        def __init__(self):
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path", reset_sense_strategy=False)
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            if word == "memburuk":
+                return ["bersih"]
+            else:
+                raise NotImplementedError(f"Unexpected word \"{word}\" in _get_antonym_list")
+
+    sr = DummyStyleRewriting()
+    text = "semenjak joes berganti kepemilikan, kondisinya semakin memburuk."
+    graph = penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / buruk-07 :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))""")
+    source_style = "LABEL_0"
+    style_words = ["memburuk"]
+    result = sr(text, graph, source_style, style_words)
+    assert penman.encode(result, indent=None) == penman.encode(
+        penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / bersih-07 :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))"""),
+        indent=None
+    )
+
+def test_style_rewriting_replace_non_frame_instance():
+    stemmer = StemmerFactory().create_stemmer()
+    assert stemmer.stem("memburuk") == stemmer.stem("buruk")
+
+    class DummyStyleRewriting(StyleRewriting):
+        def __init__(self):
+            super().__init__("dummy_clf_pipeline", "dummy_fasttext_model_path")
+
+        def _load_fasttext_model(self, fasttext_model_path):
+            pass
+
+        def _load_clf_pipeline(self, clf_pipeline):
+            self.clf_pipe = lambda x: [{"label": "LABEL_1"}]
+
+        def _get_antonym_list(self, word: str):
+            if word == "memburuk":
+                return ["bersih"]
+            else:
+                raise NotImplementedError(f"Unexpected word \"{word}\" in _get_antonym_list")
+
+    sr = DummyStyleRewriting()
+    text = "semenjak joes berganti kepemilikan, kondisinya semakin memburuk."
+    graph = penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / buruk :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))""")
+    source_style = "LABEL_0"
+    style_words = ["memburuk"]
+    result = sr(text, graph, source_style, style_words)
+    assert penman.encode(result, indent=None) == penman.encode(
+        penman.decode("""(z0 / memiliki-derajat-91 :ARG1 (z1 / kondisi :poss (z2 / dia)) :ARG2 (z3 / bersih :ARG1-of (z4 / meningkat-02)) :ARG3 (z5 / lebih) :time (z6 / setelah :op1 (z7 / pindah-01 :ARG0 (z8 / orang :wiki - :name (z9 / nama :op1 "joes")) :ARG1 (z10 / sendiri-01 :ARG0 z8))))"""),
+        indent=None
+    )

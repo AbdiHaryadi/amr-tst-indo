@@ -380,12 +380,14 @@ class StyleRewriting:
             if not found:
                 var, rel, instance = t
                 if var == selected_var and rel == ":instance":
-                    new_instance = instance.replace("-", " ")
-                    new_instance = new_instance.replace(source_word, target_word)
+                    new_instance = target_word
                     new_instance = new_instance.replace("_", " ")
                     new_instance = new_instance.replace(" ", "-")
-                    if self.reset_sense_strategy and self._is_frame(new_instance):
-                        new_instance = new_instance[:-3] + "-00"
+                    if self._is_frame(instance):
+                        if self.reset_sense_strategy:
+                            new_instance += "-00"
+                        else:
+                            new_instance += instance[-3:]
 
                     new_t = (var, rel, new_instance)
                     new_triples.append(new_t)
