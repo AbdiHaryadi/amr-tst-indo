@@ -303,6 +303,7 @@ class TextToAMR:
             padding=True,
             pad_to_multiple_of=None,
             return_tensors="pt",
+            device=self.model.device
         )
         preds = self.model.generate(
             txt_ids["input_ids"],
