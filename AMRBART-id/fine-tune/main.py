@@ -4,11 +4,19 @@ import os
 import sys
 import nltk  # Here to have a nice missing dependency error message early on
 import logging
+
+import datasets
 from datasets import load_from_disk
 from model_interface.tokenization_bart import AMRBartTokenizer
+
 from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainingArguments
 from common.utils import smart_emb_init
 from filelock import FileLock
+import numpy as np
+from pathlib import Path
+import penman
+import smatch
+
 from transformers import (
     AutoConfig,
     HfArgumentParser,
@@ -20,6 +28,7 @@ from transformers import (
     set_seed,
     EarlyStoppingCallback,
 )
+import transformers
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import is_offline_mode
 from transformers.utils.versions import require_version
@@ -54,6 +63,10 @@ MULTILINGUAL_TOKENIZERS = [
     MBart50TokenizerFast,
 ]
 
+def calculate_smatch(test_path, predictions_path) -> dict:
+    with Path(predictions_path).open() as p, Path(test_path).open() as g:
+        score = next(smatch.score_amr_pairs(p, g))
+    return {"smatch": score[2]}
 
 def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
@@ -73,19 +86,18 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    # log_level = training_args.get_process_log_level()
-    # logger.setLevel(log_level)
-    # datasets.utils.logging.set_verbosity(log_level)
-    # transformers.utils.logging.set_verbosity(log_level)
-    # transformers.utils.logging.enable_default_handler()
-    # transformers.utils.logging.enable_explicit_format()
+    log_level = logging.WARN
+    logger.setLevel(log_level)
+    datasets.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.enable_default_handler()
+    transformers.utils.logging.enable_explicit_format()
 
-    # # Log on each process the small summary:
-    # logger.warning(
-    #     f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-    #     + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
-    # )
-    # logger.info(f"Training/evaluation parameters {training_args}")
+    # Log on each process the small summary:
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+    )
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -277,10 +289,87 @@ def main():
     if training_args.hub_model_id:
         training_args.push_to_hub = True
 
-    # compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
-    callbacks = []
-    if training_args.early_stopping is not None:
-        callbacks.append(EarlyStoppingCallback(early_stopping_patience=training_args.early_stopping))
+    def compute_metrics_parsing(eval_preds, global_step=0, prefix="val"):
+        prefix = "test" if prefix == "predict" else "val"
+        preds, labels, inputs = eval_preds
+        
+
+        inputs = np.where(inputs != -100, inputs, tokenizer.pad_token_id)
+        decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
+
+        output_gold_file = "gold.txt"
+        if not os.path.isfile(output_gold_file):
+            prepare_amr_output_file(labels, output_gold_file, decoded_inputs)
+
+        if isinstance(preds, tuple):
+            preds = preds[0]
+
+        os.makedirs(training_args.output_dir + "/val_outputs/", exist_ok=True)
+        output_prediction_file = f"{training_args.output_dir}/val_outputs/{prefix}_generated_predictions_{global_step}.txt"
+        prepare_amr_output_file(preds, output_prediction_file, decoded_inputs)
+
+        try:
+            smatch_score = calculate_smatch(
+                output_gold_file, output_prediction_file
+            )
+        except BaseException as e:
+            print('An exception occurred on calculating smatch')
+            print(e)
+            smatch_score = {"smatch": -42.0}
+
+        result = {"smatch":smatch_score["smatch"]}
+        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
+        result["gen_len"] = np.mean(prediction_lens)
+        result = {k: round(v, 4) for k, v in result.items()}
+        return result
+
+    def prepare_amr_output_file(preds, output_prediction_file, decoded_inputs):
+        graphs = []
+        for idx in range(len(preds)):
+            graphs_same_source = []
+            graphs.append(graphs_same_source)
+            ith_pred = preds[idx]
+            ith_pred[0] = tokenizer.bos_token_id
+            ith_pred = [
+                tokenizer.eos_token_id if itm == tokenizer.amr_eos_token_id else itm
+                for itm in ith_pred if itm != tokenizer.pad_token_id
+            ]
+
+            graph, status, (lin, backr) = tokenizer.decode_amr(
+                ith_pred, restore_name_ops=False
+            )
+            graph.status = status
+            graph.nodes = lin
+            graph.backreferences = backr
+            graph.tokens = ith_pred
+            graphs_same_source.append(graph)
+
+        graphs_same_source[:] = tuple(
+            zip(*sorted(enumerate(graphs_same_source), key=lambda x: (x[1].status.value, x[0])))
+        )[1]
+        idx = 0
+        assert len(graphs) == len(decoded_inputs), f"inconsistent lenths {len(graphs)} vs {len(decoded_inputs)}"
+        for gps, snt in zip(graphs, decoded_inputs):
+            # print(gps, src)
+            # exit()
+            for gp in gps:
+                # metadata = gg.metadata.copy()
+                metadata = {}
+                metadata["id"] = str(idx)
+                # metadata["date"] = str(datetime.datetime.now())
+                metadata["snt"] = snt.replace("<AMR>", '').replace("</AMR>", '').strip()
+                if "save-date" in metadata:
+                    del metadata["save-date"]
+                gp.metadata = metadata
+                idx += 1
+
+        # print("Before Penman Encoding")
+        pieces = [penman.encode(g[0]) for g in graphs]
+        # write predictions and targets for later rouge evaluation.
+        with open(output_prediction_file, "w") as p_writer:
+            p_writer.write("\n\n".join(pieces))
+
+    compute_metrics = None if training_args.task == "amr2text" else compute_metrics_parsing
 
     trainer = Seq2SeqTrainer(
         model=model,
@@ -289,8 +378,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=callbacks if len(callbacks) > 0 else None,
-        # compute_metrics=compute_metrics if training_args.predict_with_generate else None,
+        compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
     # Training
