@@ -300,12 +300,8 @@ def main():
 
         output_gold_file = "gold.txt"
         if not os.path.isfile(output_gold_file):
-            print("--- DEBUG:", labels)
-
-            if isinstance(labels, tuple):
-                labels = labels[0]
-                print("--- DEBUG: labels <- labels[0]")
-
+            print("--- DEBUG:", f"{preds=}")
+            print("--- DEBUG:", f"{labels=}")
             prepare_amr_output_file(labels, output_gold_file, decoded_inputs)
 
         if isinstance(preds, tuple):
@@ -378,10 +374,11 @@ def main():
 
     compute_metrics = None if training_args.task == "amr2text" else compute_metrics_parsing
 
-    callbacks = []
-    if training_args.report_to == "wandb":
-        callbacks.append(WandbCallback())
-        print("WandbCallback activated.")
+    callbacks = [WandbCallback()]
+    print(f"DEBUG: {training_args=}")
+    # if training_args.report_to == "wandb":
+    #     callbacks.append(WandbCallback())
+    #     print("WandbCallback activated.")
 
     trainer = Seq2SeqTrainer(
         model=model,
