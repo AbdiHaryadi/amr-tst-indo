@@ -300,9 +300,7 @@ def main():
 
         output_gold_file = "gold.txt"
         if not os.path.isfile(output_gold_file):
-            print("--- DEBUG:", f"{preds=}")
-            print("--- DEBUG:", f"{labels=}")
-            prepare_amr_output_file(labels, output_gold_file, decoded_inputs, replace_first_token_with_bos=False)
+            prepare_amr_output_file(labels, output_gold_file, decoded_inputs, bos_token_action="insert")
 
         if isinstance(preds, tuple):
             preds = preds[0]
@@ -326,14 +324,18 @@ def main():
         result = {k: round(v, 4) for k, v in result.items()}
         return result
 
-    def prepare_amr_output_file(preds, output_prediction_file, decoded_inputs, replace_first_token_with_bos: bool = True):
+    def prepare_amr_output_file(preds, output_prediction_file, decoded_inputs, bos_token_action: str = "replace"):
         graphs = []
         for idx in range(len(preds)):
             graphs_same_source = []
             graphs.append(graphs_same_source)
             ith_pred = preds[idx]
-            if replace_first_token_with_bos:
+
+            if bos_token_action == "insert":
+                ith_pred = [tokenizer.bos_token_id] + ith_pred
+            else:
                 ith_pred[0] = tokenizer.bos_token_id
+            
             ith_pred = [
                 tokenizer.eos_token_id if itm == tokenizer.amr_eos_token_id else itm
                 for itm in ith_pred if itm != tokenizer.pad_token_id
