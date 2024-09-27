@@ -170,7 +170,13 @@ class AMRBartTokenizer(MBart50Tokenizer):
                 # print('nodes', nodes, file=sys.stderr)
                 # print('backreferences', backreferences, file=sys.stderr)
                 # print('graph', graph, file=sys.stderr)
-            return graph, status, (nodes, backreferences)
+
+            if isinstance(graph, penman.Graph) and len(graph.triples) > 0:
+                return graph, status, (nodes, backreferences)
+            else:
+                print("Empty AMR failure!", file=sys.stderr)
+                return postprocessing.BACKOFF, postprocessing.ParsedStatus.BACKOFF, (None, None)
+            
         except Exception as e:
             print('Reconnection 2 failure', file=sys.stderr)
             print(get_traceback(e), file=sys.stderr)
@@ -246,6 +252,7 @@ class AMRBartTokenizer(MBart50Tokenizer):
 
         i = 0
         nodes_ = []
+        last = None
         while i < (len(nodes) - 1):
             if nodes[i] == ':':
                 nodes_.append(nodes[i] + nodes[i+1])
@@ -255,6 +262,10 @@ class AMRBartTokenizer(MBart50Tokenizer):
                 nodes_.append(nodes[i])
                 i += 1
                 last = True
+
+        print(f"DEBUG: {nodes}")
+        print(f"DEBUG: {nodes_}")
+        print(f"DEBUG: {last=}")
         if last:
             nodes_.append(nodes[-1])
         nodes = nodes_

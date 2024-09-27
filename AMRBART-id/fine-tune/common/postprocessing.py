@@ -206,14 +206,16 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
 
     tokens = [token_processing(t) for t in tokens]
 
+    print(f"DEBUG: {tokens=}")
+
     shift = 1
-    if tokens[1] == "<s>":
+    if len(tokens) > 1 and tokens[1] == "<s>":
         shift = 2
 
     tokens = tokens[shift:]
     backreferences = [b if b == -1 else b - shift for b in backreferences[shift:]]
 
-    if tokens[-1] == "</s>":
+    if len(tokens) > 0 and tokens[-1] == "</s>":
         tokens.pop()
         backreferences.pop()
 
