@@ -205,9 +205,7 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             break
 
     tokens = [token_processing(t) for t in tokens]
-
-    print(f"DEBUG: {tokens=}")
-
+    
     shift = 1
     if len(tokens) > 1 and tokens[1] == "<s>":
         shift = 2

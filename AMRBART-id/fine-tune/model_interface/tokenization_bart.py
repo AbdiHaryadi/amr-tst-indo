@@ -263,9 +263,6 @@ class AMRBartTokenizer(MBart50Tokenizer):
                 i += 1
                 last = True
 
-        print(f"DEBUG: {nodes}")
-        print(f"DEBUG: {nodes_}")
-        print(f"DEBUG: {last=}")
         if last:
             nodes_.append(nodes[-1])
         nodes = nodes_
@@ -323,7 +320,7 @@ class AMRBartTokenizer(MBart50Tokenizer):
         pieces_ = []
         open_cnt = 0
         closed_cnt = 0
-        if nodes[0] != '(':
+        if len(nodes) == 0 or nodes[0] != '(':
             pieces_.append('(')
             open_cnt += 1
         for p in nodes:
