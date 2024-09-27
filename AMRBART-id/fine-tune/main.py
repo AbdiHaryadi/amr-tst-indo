@@ -302,7 +302,7 @@ def main():
         if not os.path.isfile(output_gold_file):
             print("--- DEBUG:", f"{preds=}")
             print("--- DEBUG:", f"{labels=}")
-            prepare_amr_output_file(labels, output_gold_file, decoded_inputs)
+            prepare_amr_output_file(labels, output_gold_file, decoded_inputs, replace_first_token_with_bos=False)
 
         if isinstance(preds, tuple):
             preds = preds[0]
@@ -326,13 +326,14 @@ def main():
         result = {k: round(v, 4) for k, v in result.items()}
         return result
 
-    def prepare_amr_output_file(preds, output_prediction_file, decoded_inputs):
+    def prepare_amr_output_file(preds, output_prediction_file, decoded_inputs, replace_first_token_with_bos: bool = True):
         graphs = []
         for idx in range(len(preds)):
             graphs_same_source = []
             graphs.append(graphs_same_source)
             ith_pred = preds[idx]
-            ith_pred[0] = tokenizer.bos_token_id
+            if replace_first_token_with_bos:
+                ith_pred[0] = tokenizer.bos_token_id
             ith_pred = [
                 tokenizer.eos_token_id if itm == tokenizer.amr_eos_token_id else itm
                 for itm in ith_pred if itm != tokenizer.pad_token_id
@@ -374,11 +375,10 @@ def main():
 
     compute_metrics = None if training_args.task == "amr2text" else compute_metrics_parsing
 
-    callbacks = [WandbCallback()]
-    print(f"DEBUG: {training_args=}")
-    # if training_args.report_to == "wandb":
-    #     callbacks.append(WandbCallback())
-    #     print("WandbCallback activated.")
+    callbacks = []
+    if "wandb" in training_args.report_to:
+        callbacks.append(WandbCallback())
+        print("WandbCallback activated.")
 
     trainer = Seq2SeqTrainer(
         model=model,
