@@ -299,6 +299,12 @@ def main():
 
         output_gold_file = "gold.txt"
         if not os.path.isfile(output_gold_file):
+            print("--- DEBUG:", labels)
+
+            if isinstance(labels, tuple):
+                labels = labels[0]
+                print("--- DEBUG: labels <- labels[0]")
+
             prepare_amr_output_file(labels, output_gold_file, decoded_inputs)
 
         if isinstance(preds, tuple):
