@@ -55,6 +55,7 @@ python -u main.py \
     --weight_decay 0.01 \
     --max_grad_norm 0 \
     --max_steps -1 \
+    --predict_with_generate \
     --smart_init False \
     --use_fast_tokenizer False \
     --logging_dir $OutputDir/logs \
@@ -67,7 +68,9 @@ python -u main.py \
     --dataloader_num_workers 1 \
     --eval_dataloader_num_workers 1 \
     --load_best_model_at_end True \
+    --metric_for_best_model "eval_smatch" \
     --include_inputs_for_metrics \
+    --greater_is_better True \
     --do_train \
     --do_eval \
     --ddp_find_unused_parameters False \
