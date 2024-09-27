@@ -29,6 +29,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 import transformers
+from transformers.integrations import WandbCallback
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import is_offline_mode
 from transformers.utils.versions import require_version
@@ -377,12 +378,18 @@ def main():
 
     compute_metrics = None if training_args.task == "amr2text" else compute_metrics_parsing
 
+    callbacks = []
+    if training_args.report_to == "wandb":
+        callbacks.append(WandbCallback())
+        print("WandbCallback activated.")
+
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
+        callbacks=None if len(callbacks) == 0 else callbacks,
         data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
