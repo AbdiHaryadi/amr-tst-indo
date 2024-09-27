@@ -171,7 +171,7 @@ class AMRBartTokenizer(MBart50Tokenizer):
                 # print('backreferences', backreferences, file=sys.stderr)
                 # print('graph', graph, file=sys.stderr)
 
-            if isinstance(graph, penman.Graph) and len(graph.triples) > 0:
+            if isinstance(graph, penman.Graph) and len(graph.triples) > 0 and graph.triples[0][0] is not None:
                 return graph, status, (nodes, backreferences)
             else:
                 print("Empty AMR failure!", file=sys.stderr)
