@@ -76,5 +76,6 @@ python -u main.py \
     --ddp_find_unused_parameters False \
     --hub_model_id $HubModelId \
     --hub_strategy "checkpoint" \
+    --hub_always_push True \
     --report_to "wandb" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run-$(date +"%Y-%m-%dT%H:%M:%S%:z").log
