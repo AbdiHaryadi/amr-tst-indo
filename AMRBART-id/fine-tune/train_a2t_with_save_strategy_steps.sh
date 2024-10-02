@@ -70,7 +70,7 @@ python -u main.py \
     --dataloader_num_workers 1 \
     --eval_dataloader_num_workers 1 \
     --load_best_model_at_end True \
-    --metric_for_best_model "eval_smatch" \
+    --metric_for_best_model "eval_bleu" \
     --include_inputs_for_metrics \
     --greater_is_better True \
     --do_train \
