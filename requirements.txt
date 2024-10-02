@@ -4,7 +4,7 @@ cached-property==1.5.2
 ConfigArgParse==1.7
 datasets==2.20.0
 editdistance==0.8.1
-evaluate==0.4.2
+evaluate==0.4.3
 fasttext==0.9.3
 h5py-cache==1.0
 networkx==3.3
@@ -22,7 +22,7 @@ sentence-transformers==3.0.1
 sentencepiece==0.2.0
 smatch==1.0.4
 tensorboardX==2.6.2.2
-torch==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
 torchmetrics==1.4.0.post0
 tqdm==4.66.4
 transformers==4.44.0
