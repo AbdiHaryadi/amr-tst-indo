@@ -17,6 +17,8 @@ from pathlib import Path
 import penman
 import smatch
 
+import evaluate
+import transformers
 from transformers import (
     AutoConfig,
     HfArgumentParser,
@@ -26,10 +28,7 @@ from transformers import (
     MBartTokenizer,
     MBartTokenizerFast,
     set_seed,
-    EarlyStoppingCallback,
 )
-import transformers
-from transformers.integrations import WandbCallback
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import is_offline_mode
 from transformers.utils.versions import require_version
@@ -374,13 +373,48 @@ def main():
         # write predictions and targets for later rouge evaluation.
         with open(output_prediction_file, "w") as p_writer:
             p_writer.write("\n\n".join(pieces))
+    
+    metric = evaluate.load("evaluate-metric/sacrebleu") if training_args.task == "amr2text" else None
 
-    compute_metrics = None if training_args.task == "amr2text" else compute_metrics_parsing
+    def compute_metrics_generation(eval_preds, prefix="val"):
+        prefix = "test" if prefix == "predict" else "val"
+        preds, labels, inputs = eval_preds
+        if isinstance(preds, tuple):
+            preds = preds[0]
 
-    callbacks = []
-    if "wandb" in training_args.report_to:
-        callbacks.append(WandbCallback())
-        print("WandbCallback activated.")
+        def postprocess_text(preds, labels):
+            preds = [pred.strip() for pred in preds]
+            labels = [[label.strip()] for label in labels]           # sacrebleu uses multi reference setting
+            return preds, labels
+
+        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+        if data_args.ignore_pad_token_for_loss:
+            # Replace -100 in the labels as we can't decode them.
+            labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+        # Some simple post-processing
+        decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+
+        result = metric.compute(
+            predictions=decoded_preds, references=decoded_labels, lowercase=True
+        )
+        print(result)
+        result = {"bleu": result["score"]}
+        os.makedirs(training_args.output_dir + "/val_outputs/", exist_ok=True)
+
+        random_id = np.random.randint(10_000_000, 99_999_999)
+        output_prediction_file = f"{training_args.output_dir}/val_outputs/{prefix}_generated_predictions_{random_id}.txt"
+        with open(output_prediction_file, "w") as p_writer:
+            p_writer.write("\n".join(decoded_preds) + "\n")
+
+        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
+        result["gen_len"] = np.mean(prediction_lens)
+        result = {k: round(v, 4) for k, v in result.items()}
+        return result
+
+    compute_metrics = compute_metrics_generation if training_args.task == "amr2text" else compute_metrics_parsing
 
     trainer = Seq2SeqTrainer(
         model=model,
@@ -388,7 +422,6 @@ def main():
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
-        callbacks=None if len(callbacks) == 0 else callbacks,
         data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
