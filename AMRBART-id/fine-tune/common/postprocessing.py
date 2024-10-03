@@ -36,7 +36,13 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
 
     # get strings
+    print("---DEBUG 5----")
+    print(f"{subtoken_ids=}")
+
     subtokens = tokenizer.decode(subtoken_ids, skip_special_tokens=True).split(" ")
+
+    print("---DEBUG 6----")
+    print(f"{subtokens=}")
 
     # fix backreferences
     subtoken_backreferences = [max(t - len(tokenizer.vocab), -1) for t in subtoken_ids]
@@ -49,6 +55,9 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             if s != ("<pad>")
         ]
     )
+
+    print("---DEBUG 7----")
+    print(f"{subtokens=}")
 
     # subword collapse
     tokens = []
@@ -116,6 +125,9 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
         # in any other case attach to the previous
         else:
             tokens[-1] = tokens[-1] + subtok
+
+    print("---DEBUG 8----")
+    print(f"{tokens=}")
     
     # strip INIT and fix byte-level
     tokens = [
@@ -123,8 +135,14 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
         for t in tokens
     ]
 
+    print("---DEBUG 9----")
+    print(f"{tokens=}")
+
     # unks are substituted with thing
     tokens = [t if t != "<unk>" else "thing" for t in tokens]
+
+    print("---DEBUG 10----")
+    print(f"{tokens=}")
 
     old_tokens = tokens
     old_backreferences = backreferences
@@ -204,7 +222,13 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
             backreferences += backreferences_addition
             break
 
+    print("---DEBUG 11----")
+    print(f"{tokens=}")
+
     tokens = [token_processing(t) for t in tokens]
+
+    print("---DEBUG 12----")
+    print(f"{tokens=}")
     
     shift = 1
     if len(tokens) > 1 and tokens[1] == "<s>":
@@ -216,6 +240,9 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     if len(tokens) > 0 and tokens[-1] == "</s>":
         tokens.pop()
         backreferences.pop()
+
+    print("---DEBUG 13----")
+    print(f"{tokens=}")
 
     return tokens, backreferences
 
