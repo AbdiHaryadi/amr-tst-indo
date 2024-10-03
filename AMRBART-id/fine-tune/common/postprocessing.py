@@ -155,7 +155,7 @@ def subword_collapse(tokenizer, subtokens, subtoken_backreferences):
     rex_arg = re.compile(f"^{tokenizer.INIT}(op|snt|conj|prep)")
     rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
 
-    tokens = [] # <- Kemungkinan di sini?
+    tokens = []
     backreferences = []
     subword_to_token_map = {}
     current_token_i = 0
