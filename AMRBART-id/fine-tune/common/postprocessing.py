@@ -30,11 +30,7 @@ def token_processing(tok):
     else:
         return tok
 
-
 def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
-    rex_arg = re.compile(f"^{tokenizer.INIT}(op|snt|conj|prep)")
-    rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
-
     # get strings
     print("---DEBUG 5----")
     print(f"{subtoken_ids=}")
@@ -60,71 +56,7 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
     print(f"{subtokens=}")
 
     # subword collapse
-    tokens = []
-    backreferences = []
-    subword_to_token_map = {}
-    current_token_i = 0
-    for subw_i, (subw_backr, subtok) in enumerate(zip(subtoken_backreferences, subtokens)):
-        subword_to_token_map[subw_i] = current_token_i
-
-        # if empty you cannot do anything but add a new word
-        if not tokens:
-            tokens.append(subtok.lstrip(tokenizer.INIT))
-            backreferences.append(-1)
-            current_token_i += 1
-
-        # backref can't be splitted
-        elif subw_backr > -1:
-            tokens.append(None)
-            backreferences.append(subword_to_token_map[subw_backr])
-            current_token_i += 1
-
-        # after a special token release
-        elif isinstance(tokens[-1], str) and rex_spc.match(tokens[-1]):
-            tokens.append(subtok.lstrip(tokenizer.INIT))
-            backreferences.append(-1)
-            current_token_i += 1
-
-        # after a subtoken ':' (which should be followed by the rest of the edge) ignore tokenizer.INIT
-        # TODO: this is an ugly patch due to the fact that BART tokenizer splits after ':'
-        elif (tokens[-1] == ":") and rex_arg.match(subtok):
-            tokens[-1] = tokens[-1] + subtok[1:]
-
-        # leading tokenizer.INIT
-        elif subtok.startswith(tokenizer.INIT):
-            tokens.append(subtok.lstrip(tokenizer.INIT))
-            backreferences.append(-1)
-            current_token_i += 1
-
-        # very ugly patch for some cases in which tokenizer.INIT is not in the following token to the edge
-        elif (
-            isinstance(tokens[-1], str)
-            and tokens[-1].startswith(":")
-            and tokens[-1][-1].isdigit()
-            and (subtok != "-of")
-        ):
-            tokens.append(subtok.lstrip(tokenizer.INIT))
-            backreferences.append(-1)
-            current_token_i += 1
-
-        elif subtok == '(':
-            tokens.append(subtok)
-            backreferences.append(-1)
-            current_token_i += 1
-
-        elif subtok == ')':
-            tokens.append(subtok)
-            backreferences.append(-1)
-            current_token_i += 1
-
-        elif subtok == '-':
-            tokens.append(subtok)
-            backreferences.append(-1)
-            current_token_i += 1
-
-        # in any other case attach to the previous
-        else:
-            tokens[-1] = tokens[-1] + subtok
+    tokens, backreferences = subword_collapse(tokenizer, subtokens, subtoken_backreferences)
 
     print("---DEBUG 8----")
     print(f"{tokens=}")
@@ -246,6 +178,80 @@ def decode_into_node_and_backreferences(subtoken_ids, tokenizer):
 
     return tokens, backreferences
 
+def subword_collapse(tokenizer, subtokens, subtoken_backreferences):
+    rex_arg = re.compile(f"^{tokenizer.INIT}(op|snt|conj|prep)")
+    rex_spc = re.compile(r"<(s|/s|lit|/lit|stop|unk|pad|mask)>")
+
+    tokens = [] # <- Kemungkinan di sini?
+    backreferences = []
+    subword_to_token_map = {}
+    current_token_i = 0
+    for subw_i, (subw_backr, subtok) in enumerate(zip(subtoken_backreferences, subtokens)):
+        subword_to_token_map[subw_i] = current_token_i
+        if not isinstance(subtok, str):
+            print(f"Warning: non-string subtoken detected: {subtok} ({type(subtok)}). It will be converted to string.")
+            subtok = str(subtok)
+
+        # if empty you cannot do anything but add a new word
+        if not tokens:
+            tokens.append(subtok.lstrip(tokenizer.INIT))
+            backreferences.append(-1)
+            current_token_i += 1
+
+        # backref can't be splitted
+        elif subw_backr > -1:
+            tokens.append(None)
+            backreferences.append(subword_to_token_map[subw_backr])
+            current_token_i += 1
+
+        # after a special token release
+        elif isinstance(tokens[-1], str) and rex_spc.match(tokens[-1]):
+            tokens.append(subtok.lstrip(tokenizer.INIT))
+            backreferences.append(-1)
+            current_token_i += 1
+
+        # after a subtoken ':' (which should be followed by the rest of the edge) ignore tokenizer.INIT
+        # TODO: this is an ugly patch due to the fact that BART tokenizer splits after ':'
+        elif (tokens[-1] == ":") and rex_arg.match(subtok):
+            tokens[-1] = tokens[-1] + subtok[1:]
+
+        # leading tokenizer.INIT
+        elif subtok.startswith(tokenizer.INIT):
+            tokens.append(subtok.lstrip(tokenizer.INIT))
+            backreferences.append(-1)
+            current_token_i += 1
+
+        # Patch assumption: If last token is an edge, then any token should be separated, unless it's starts with - (such as -of or for handling "prep-X")
+        elif (
+            isinstance(tokens[-1], str)
+            and tokens[-1].startswith(":")
+            and len(subtok) > 0
+            and (not subtok.startswith("-"))
+        ):
+            tokens.append(subtok.lstrip(tokenizer.INIT))
+            backreferences.append(-1)
+            current_token_i += 1
+
+        elif subtok == '(':
+            tokens.append(subtok)
+            backreferences.append(-1)
+            current_token_i += 1
+
+        elif subtok == ')':
+            tokens.append(subtok)
+            backreferences.append(-1)
+            current_token_i += 1
+
+        elif subtok == '-':
+            tokens.append(subtok)
+            backreferences.append(-1)
+            current_token_i += 1
+
+        # in any other case attach to the previous
+        else:
+            tokens[-1] = tokens[-1] + subtok
+    
+    return tokens,backreferences
 
 def index_of(element, iterable, default=None, start=None, end=None):
     if not callable(element):
