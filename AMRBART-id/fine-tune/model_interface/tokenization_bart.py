@@ -147,29 +147,44 @@ class AMRBartTokenizer(MBart50Tokenizer):
         # print()
         # print()
         try:
+            print("---DEBUG 1----")
+            print(f"{tokens=}")
+
             nodes, backreferences = postprocessing.decode_into_node_and_backreferences(
                 tokens, self)
+            
+            print("---DEBUG 2----")
+            print(f"{nodes=}")
+            print(f"{backreferences=}")
+
         except Exception as e:
             print('Decoding failure', file=sys.stderr)
             print(get_traceback(e), file=sys.stderr)
             return postprocessing.BACKOFF, postprocessing.ParsedStatus.BACKOFF, (None, None)
         try:
             graph = self._fix_and_make_graph(nodes)
-            # if collapse_name_ops:
-            #     graph = postprocessing._split_name_ops(graph)
+
+            print("---DEBUG 3----")
+            print(f"{graph=}")
+            if isinstance(graph, penman.Graph):
+                print(f"{penman.encode(graph)=}")
+            
         except Exception as e:
             print('Building failure', file=sys.stderr)
             print(get_traceback(e), file=sys.stderr)
-            # print('nodes', nodes, file=sys.stderr)
-            # print('backreferences', backreferences, file=sys.stderr)
             return postprocessing.BACKOFF, postprocessing.ParsedStatus.BACKOFF, (None, None)
+        
         try:
             graph, status = postprocessing.connect_graph_if_not_connected(graph)
+
+            print("---DEBUG 4----")
+            print(f"{graph=}")
+            if isinstance(graph, penman.Graph):
+                print(f"{penman.encode(graph)=}")
+            print(f"{status=}")
+
             if status == postprocessing.ParsedStatus.BACKOFF:
                 print('Reconnection 1 failure:')
-                # print('nodes', nodes, file=sys.stderr)
-                # print('backreferences', backreferences, file=sys.stderr)
-                # print('graph', graph, file=sys.stderr)
 
             if isinstance(graph, penman.Graph) and len(graph.triples) > 0 and graph.triples[0][0] is not None:
                 return graph, status, (nodes, backreferences)
@@ -180,9 +195,6 @@ class AMRBartTokenizer(MBart50Tokenizer):
         except Exception as e:
             print('Reconnection 2 failure', file=sys.stderr)
             print(get_traceback(e), file=sys.stderr)
-            # print('nodes', nodes, file=sys.stderr)
-            # print('backreferences', backreferences, file=sys.stderr)
-            # print('graph', graph, file=sys.stderr)
             return postprocessing.BACKOFF, postprocessing.ParsedStatus.BACKOFF, (nodes, backreferences)
 
     def _fix_and_make_graph(self, nodes):
