@@ -186,6 +186,7 @@ def subword_collapse(tokenizer, subtokens, subtoken_backreferences):
     backreferences = []
     subword_to_token_map = {}
     current_token_i = 0
+    in_literal = False
     for subw_i, (subw_backr, subtok) in enumerate(zip(subtoken_backreferences, subtokens)):
         subword_to_token_map[subw_i] = current_token_i
         if not isinstance(subtok, str):
@@ -217,7 +218,19 @@ def subword_collapse(tokenizer, subtokens, subtoken_backreferences):
 
         # leading tokenizer.INIT
         elif subtok.startswith(tokenizer.INIT):
-            tokens.append(subtok.lstrip(tokenizer.INIT))
+            mod_subtok = subtok.lstrip(tokenizer.INIT)
+            tokens.append(mod_subtok)
+            backreferences.append(-1)
+            current_token_i += 1
+
+            if mod_subtok == "<lit>":
+                in_literal = True
+            elif mod_subtok == "</lit>":
+                in_literal = False
+
+        elif in_literal:
+            # Don't collapse it!
+            tokens.append(subtok)
             backreferences.append(-1)
             current_token_i += 1
 
