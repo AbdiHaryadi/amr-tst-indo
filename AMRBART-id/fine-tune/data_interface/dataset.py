@@ -31,7 +31,7 @@ def padding_func(features, padding_side="right", pad_token_id=1, key="label", pa
 
 class AMRParsingDataSet(Dataset):
     def __init__(
-        self, tokenizer, args, model_args
+        self, tokenizer, args, model_args, use_lang_prefix=False
     ):
         super().__init__()
         self.train_file = args.train_file
@@ -64,9 +64,18 @@ class AMRParsingDataSet(Dataset):
             trust_remote_code=True
         )
 
+        self.use_lang_prefix = use_lang_prefix
+
     def tokenize_function(self, examples):
         amr = examples["src"]  # AMR tokens
         txt = examples["tgt"]  # Text tokens
+
+        if self.use_lang_prefix:
+            langs = examples["lang"]
+            lang_mapper = {
+                "id": "id_ID",
+            }
+            txt = [lang_mapper[langs[i]] + inp for i, inp in enumerate(txt)]
 
         amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
 

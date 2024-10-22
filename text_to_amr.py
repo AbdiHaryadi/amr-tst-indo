@@ -242,15 +242,10 @@ class TextToAMR:
         Args:
         - `sentences`: List of sentence.
         """
-        if self.use_prefix:
-            used_sentences = ["id_ID" + x for x in sentences]
-        else:
-            used_sentences = sentences
-
         if method == 1:
-            return self._call_method_1(used_sentences)
+            return self._call_method_1(sentences)
         elif method == 2:
-            return self._call_method_2(used_sentences)
+            return self._call_method_2(sentences)
         else:
             raise ValueError(f"No method {method}")
         
@@ -367,7 +362,12 @@ class TextToAMR:
                 json_str = json.dumps({"sent": x, "amr": "", "lang": "id"})
                 print(json_str, file=fp)
 
-        raw_datasets = AMRParsingDataSet(self.tokenizer, data_args, self.model_args)
+        raw_datasets = AMRParsingDataSet(
+            self.tokenizer,
+            data_args,
+            self.model_args,
+            use_lang_prefix=self.use_prefix
+        )
         column_names = raw_datasets.datasets["test"].column_names
 
         if "test" not in raw_datasets.datasets:
