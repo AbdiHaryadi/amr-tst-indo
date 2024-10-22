@@ -76,7 +76,12 @@ class AMRParsingDataSet(Dataset):
                 "id": "id_ID",
             }
             txt = [lang_mapper[langs[i]] + inp for i, inp in enumerate(txt)]
-
+        
+        print("--- DEBUG 1 ---")
+        print(f"txt: ({len(txt)})")
+        for t in txt:
+            print(t)
+        
         amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
 
         raw_txt_ids = self.tokenizer(
@@ -86,6 +91,11 @@ class AMRParsingDataSet(Dataset):
             txt_ids = [itm[:self.max_src_length-3] + [self.tokenizer.amr_bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.amr_eos_token_id] for itm in raw_txt_ids]
         else:
             txt_ids = raw_txt_ids
+
+        print("--- DEBUG 2 ---")
+        print(f"txt_ids: ({len(txt_ids)})")
+        for ti in txt_ids:
+            print(ti)
 
         return {
             "input_ids": txt_ids,
