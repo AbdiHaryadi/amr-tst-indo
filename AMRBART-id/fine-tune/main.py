@@ -193,10 +193,15 @@ def main():
     if bool(os.environ.get("IS_CONCAT", "False") == "True"):
         raise NotImplementedError("IS_CONCAT == True is unimplemented, at least in this code.")
     else:
-        from data_interface.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing
+        from data_interface.dataset import AMR2TextDataSet, AMRParsingDataSet, DataCollatorForAMR2Text, DataCollatorForAMRParsing, DataCollatorForAMR2TextWithLanguagePrefix
 
     DataSetCate = AMR2TextDataSet if training_args.task == "amr2text" else AMRParsingDataSet
-    raw_datasets = DataSetCate(tokenizer, data_args, model_args)
+    raw_datasets = DataSetCate(
+        tokenizer,
+        data_args,
+        model_args,
+        use_lang_prefix=training_args.use_lang_prefix if training_args.use_lang_prefix else False
+    )
     
     column_names = None
 
@@ -278,7 +283,14 @@ def main():
     # label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
     label_pad_token_id = tokenizer.pad_token_id
 
-    DataCollatorCate = DataCollatorForAMR2Text if training_args.task == "amr2text" else DataCollatorForAMRParsing
+    if training_args.task == "amr2text":
+        if training_args.use_lang_prefix:
+            DataCollatorCate = DataCollatorForAMR2TextWithLanguagePrefix
+        else:
+            DataCollatorCate = DataCollatorForAMR2Text
+    else:
+        DataCollatorCate = DataCollatorForAMRParsing    
+    
     data_collator = DataCollatorCate(
         tokenizer,
         label_pad_token_id=label_pad_token_id,
