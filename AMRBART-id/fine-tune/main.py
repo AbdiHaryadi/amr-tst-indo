@@ -284,6 +284,7 @@ def main():
     label_pad_token_id = tokenizer.pad_token_id
 
     if training_args.task == "amr2text":
+        print(f"{training_args.use_lang_prefix=}")
         if training_args.use_lang_prefix:
             DataCollatorCate = DataCollatorForAMR2TextWithLanguagePrefix
         else:

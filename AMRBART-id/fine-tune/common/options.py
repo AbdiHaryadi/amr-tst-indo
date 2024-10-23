@@ -306,3 +306,7 @@ class Seq2SeqTrainingArguments(TrainingArguments):
     eval_lenpen: Optional[float] = field(
         default=1.0, metadata={"help": "lenpen for generation"}
     )
+    use_lang_prefix: bool = field(
+        default=False,
+        metadata={"help": "Whether to use language prefix or not"},
+    )
