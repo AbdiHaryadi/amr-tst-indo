@@ -71,11 +71,7 @@ class AMRParsingDataSet(Dataset):
         txt = examples["tgt"]  # Text tokens
 
         if self.use_lang_prefix:
-            langs = examples["lang"]
-            lang_mapper = {
-                "id": "id_ID",
-            }
-            txt = [lang_mapper[langs[i]] + inp for i, inp in enumerate(txt)]
+            txt = ["id_ID" + inp for inp in txt]
 
         amr_ids = [self.tokenizer.tokenize_amr(itm.split())[:self.max_tgt_length-2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
 
@@ -168,7 +164,7 @@ class DataCollatorForAMRParsing:
 
 class AMR2TextDataSet(Dataset):
     def __init__(
-        self, tokenizer, args, model_args
+        self, tokenizer, args, model_args, use_lang_prefix=False
     ):
         super().__init__()
         self.train_file = args.train_file
@@ -201,28 +197,47 @@ class AMR2TextDataSet(Dataset):
             trust_remote_code=True
         )
 
+        self.use_lang_prefix = use_lang_prefix
+
     def tokenize_function(self, examples):
-        src = examples["src"]  # AMR tokens
-        tgt = examples["tgt"]  # Text tokens
+        amr = examples["src"]  # AMR tokens
+        txt = examples["tgt"]  # Text tokens
+
+        if self.use_lang_prefix:
+            txt = ["id_ID" + inp for inp in txt]
+
         if not self.unified_input:
-            src_ids = [[self.tokenizer.amr_bos_token_id] + self.tokenizer.tokenize_amr(itm.split())[:self.max_src_length - 2] + [self.tokenizer.amr_eos_token_id] for itm in src]
+            amr_ids = [[self.tokenizer.amr_bos_token_id] + self.tokenizer.tokenize_amr(itm.split())[:self.max_src_length - 2] + [self.tokenizer.amr_eos_token_id] for itm in amr]
         else:
             # [<s>[mask]</s><AMR>xxx</AMR>]
-            src_ids = [[self.tokenizer.bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.eos_token_id] + [self.tokenizer.amr_bos_token_id] + self.tokenizer.tokenize_amr(itm.split())[:self.max_src_length -5] + [self.tokenizer.amr_eos_token_id] for itm in src]
+            if self.use_lang_prefix:
+                bos_token_id = self.tokenizer.bos_token_id
+            else:
+                bos_token_id = self.tokenizer.lang_code_to_id["id_ID"]
+            
+            amr_ids = [
+                [bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.eos_token_id]
+                + [self.tokenizer.amr_bos_token_id]
+                + self.tokenizer.tokenize_amr(itm.split())[:self.max_src_length -5]
+                + [self.tokenizer.amr_eos_token_id]
+                for itm in amr
+            ]
             
         with self.tokenizer.as_target_tokenizer():
-            tgt_ids = self.tokenizer(
-                tgt, max_length=self.max_tgt_length, padding=False, truncation=True
+            txt_ids = self.tokenizer(
+                txt, max_length=self.max_tgt_length, padding=False, truncation=True
             )
-            # In original works, the first element of input_ids is removed
-            # because of prefix. Since there is no prefix for this model, this
-            # process is not needed.
+
+            if self.use_lang_prefix:
+                txt_ids["input_ids"] = [
+                    label[1:] for label in txt_ids["input_ids"]
+                ]
+            # else: not needed
         
         model_inputs = {}
-        model_inputs["input_ids"] = src_ids
-        model_inputs["labels"] = tgt_ids["input_ids"]
+        model_inputs["input_ids"] = amr_ids
+        model_inputs["labels"] = txt_ids["input_ids"]
         return model_inputs
-
 
 @dataclass
 class DataCollatorForAMR2Text:
@@ -288,6 +303,79 @@ class DataCollatorForAMR2Text:
             features["labels"],
             pad_token_id=self.tokenizer.pad_token_id,
             decoder_start_token_id=self.tokenizer.eos_token_id,
+        )
+
+        return {
+            "input_ids": features["input_ids"],
+            "labels": features["labels"],
+            "decoder_input_ids": features["decoder_input_ids"],
+        }
+    
+@dataclass
+class DataCollatorForAMR2TextWithLanguagePrefix:
+    """
+    Data collator that will dynamically pad the inputs received, as well as the labels. It's use langauge token as
+    a BOS.
+
+    Args:
+        tokenizer (:class:`~transformers.PreTrainedTokenizer` or :class:`~transformers.PreTrainedTokenizerFast`):
+            The tokenizer used for encoding the data.
+        model (:class:`~transformers.PreTrainedModel`):
+            The model that is being trained. If set and has the `prepare_decoder_input_ids_from_labels`, use it to
+            prepare the `decoder_input_ids`
+
+            This is useful when using `label_smoothing` to avoid calculating loss twice.
+        padding (:obj:`bool`, :obj:`str` or :class:`~transformers.file_utils.PaddingStrategy`, `optional`, defaults to :obj:`True`):
+            Select a strategy to pad the returned sequences (according to the model's padding side and padding index)
+            among:
+
+            * :obj:`True` or :obj:`'longest'`: Pad to the longest sequence in the batch (or no padding if only a single
+              sequence is provided).
+            * :obj:`'max_length'`: Pad to a maximum length specified with the argument :obj:`max_length` or to the
+              maximum acceptable input length for the model if that argument is not provided.
+            * :obj:`False` or :obj:`'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of
+              different lengths).
+        max_length (:obj:`int`, `optional`):
+            Maximum length of the returned list and optionally padding length (see above).
+        pad_to_multiple_of (:obj:`int`, `optional`):
+            If set will pad the sequence to a multiple of the provided value.
+
+            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
+            7.5 (Volta).
+        label_pad_token_id (:obj:`int`, `optional`, defaults to -100):
+            The id to use when padding the labels (-100 will be automatically ignored by PyTorch loss functions).
+    """
+
+    tokenizer: PreTrainedTokenizerBase
+    model: Optional[PreTrainedModel] = None
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+    label_pad_token_id: int = -100
+
+    def __call__(self, features):
+        
+        padding_func(
+            features,
+            padding_side=self.tokenizer.padding_side,
+            pad_token_id=self.label_pad_token_id,
+            key="labels",
+            pad_to_multiple_of=self.pad_to_multiple_of,
+        )
+        
+        features = self.tokenizer.pad(
+            features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
+
+        # prepare decoder_input_ids
+        features["decoder_input_ids"] = shift_tokens_right(
+            features["labels"],
+            pad_token_id=self.tokenizer.pad_token_id,
+            decoder_start_token_id=self.tokenizer.lang_code_to_id["id_ID"],
         )
 
         return {
