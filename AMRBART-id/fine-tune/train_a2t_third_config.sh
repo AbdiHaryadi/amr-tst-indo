@@ -21,7 +21,7 @@ if [ ! -d ${DataCache} ];then
   mkdir -p ${DataCache}
 fi
 
-lr=1e-6
+lr=2e-7
 batch_size=2
 gradient_accumulation_steps=12
 
