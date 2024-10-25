@@ -211,9 +211,9 @@ class AMR2TextDataSet(Dataset):
         else:
             # [<s>[mask]</s><AMR>xxx</AMR>]
             if self.use_lang_prefix:
-                bos_token_id = self.tokenizer.bos_token_id
-            else:
                 bos_token_id = self.tokenizer.lang_code_to_id["id_ID"]
+            else:
+                bos_token_id = self.tokenizer.bos_token_id
             
             amr_ids = [
                 [bos_token_id, self.tokenizer.mask_token_id, self.tokenizer.eos_token_id]
