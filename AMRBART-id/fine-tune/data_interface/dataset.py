@@ -222,11 +222,19 @@ class AMR2TextDataSet(Dataset):
                 + [self.tokenizer.amr_eos_token_id]
                 for itm in amr
             ]
+
+        print("--- DEBUG 1 ---")
+        print("No context:")
+        print(self.tokenizer(
+            txt, max_length=self.max_tgt_length, padding=False, truncation=True
+        ))
             
         with self.tokenizer.as_target_tokenizer():
+            print("With context:")
             txt_ids = self.tokenizer(
                 txt, max_length=self.max_tgt_length, padding=False, truncation=True
             )
+            print(txt_ids)
 
             if self.use_lang_prefix:
                 txt_ids["input_ids"] = [
