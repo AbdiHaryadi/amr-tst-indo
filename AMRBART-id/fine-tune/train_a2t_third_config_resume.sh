@@ -28,6 +28,7 @@ gradient_accumulation_steps=12
 HubModelId=${4:-}
 
 python -u main.py \
+    --resume_from_checkpoint last-checkpoint
     --use_lang_prefix \
     --data_dir $DataPath \
     --task "amr2text" \
