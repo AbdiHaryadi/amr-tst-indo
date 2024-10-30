@@ -50,5 +50,4 @@ python -u main.py \
     --include_inputs_for_metrics \
     --do_eval \
     --ddp_find_unused_parameters False \
-    --report_to "wandb" \
     --dataloader_pin_memory True 2>&1 | tee $OutputDir/run.log
