@@ -252,10 +252,18 @@ class AMRToText:
         return self._make_sentences(predict_results.predictions)
 
     def _make_sentences(self, predictions) -> list[str]:
-        decoded_preds: list[str] = self.tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        assert isinstance(decoded_preds, list)
-        assert all(isinstance(x, str) for x in decoded_preds)
-        return [pred.strip() for pred in decoded_preds]
+        decoded_preds: list[str] = []
+        for i in range(len(predictions)):
+            try:
+                p = predictions[i:i+1]
+                single_decoded_preds = self.tokenizer.batch_decode(p, skip_special_tokens=True)
+                decoded_preds.append(single_decoded_preds[0].strip())
+            except Exception as e:
+                print(f"Error when processing this prediction (index: {i}):\n {p[i]}")
+                print("Error:", e)
+                decoded_preds.append("")
+        
+        return decoded_preds
 
     @staticmethod
     def from_huggingface(repo_id: str, model_name: str, root_dir: str = DEFAULT_ROOT_DIR, hf_kwargs: dict = {}, **kwargs):
