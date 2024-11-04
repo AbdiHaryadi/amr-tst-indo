@@ -1,5 +1,5 @@
 import penman
-from amr_to_text import AMRToText
+from amr_to_text import AMRToTextBase
 from dataclasses import dataclass
 from style_detector import StyleDetector
 from style_rewriting import StyleRewriting
@@ -62,7 +62,7 @@ class AMRTST:
             t2a: TextToAMR,
             sd: StyleDetector,
             sr: StyleRewriting,
-            a2t: AMRToText
+            a2t: AMRToTextBase
     ):
         self.t2a = t2a
         self.sd = sd
