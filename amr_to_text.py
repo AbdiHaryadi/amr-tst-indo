@@ -360,6 +360,7 @@ class AMRToTextWithTaufiqMethod(AMRToTextBase):
             model_path: str,
             lowercase: bool = True,
             num_beams: int = 5,
+            max_length: int = 384,
     ):
         """
         Initialize `AMRToTextWithTaufiqMethod` class.
@@ -370,6 +371,8 @@ class AMRToTextWithTaufiqMethod(AMRToTextBase):
         - `lowercase`: Is the model can only accept lowercase inputs?
 
         - `num_beams`: Number of beams used for generation.
+
+        - `max_length`: Maximum length of prediction tokens.
         """
 
         if torch.cuda.is_available():
@@ -394,6 +397,7 @@ class AMRToTextWithTaufiqMethod(AMRToTextBase):
         self.model = model
         self.lowercase = lowercase
         self.num_beams = num_beams
+        self.max_length = max_length
 
     def __call__(self, graphs: list[penman.Graph]) -> list[str]:
         """
@@ -420,7 +424,11 @@ class AMRToTextWithTaufiqMethod(AMRToTextBase):
             )  # Batch size 1
 
             input_ids = input_ids.to(self.device)
-            outputs = self.model.generate(input_ids, num_beams=self.num_beams)
+            outputs = self.model.generate(
+                input_ids,
+                num_beams=self.num_beams,
+                max_length=self.max_length
+            )
 
             gen_text: str = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             sentences.append(gen_text)
