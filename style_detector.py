@@ -51,6 +51,11 @@ class StyleDetector:
                 continue
 
             doc = self.nlp(opinion_terms)
+            if verbose:
+                print("Stanza input:", opinion_terms)
+                print("Stanza output:")
+                print(doc)
+
             head_word = None
             head_upos = None
             head_id = -1
@@ -73,7 +78,13 @@ class StyleDetector:
             while len(modified_opinion_term_words) > 1 and head_upos == "X":
                 # We don't want the head to be X UPOS, it's not make sense.
                 modified_opinion_term_words.pop(head_id)
-                doc = self.nlp(" ".join(modified_opinion_term_words))
+                modified_opinion_terms = " ".join(modified_opinion_term_words)
+                doc = self.nlp(modified_opinion_terms)
+                if verbose:
+                    print("Stanza input:", modified_opinion_terms)
+                    print("Stanza output:")
+                    print(doc)
+
                 head_word = None
                 head_upos = None
                 head_id = -1
