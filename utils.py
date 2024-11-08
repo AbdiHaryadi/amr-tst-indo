@@ -323,3 +323,17 @@ def _convert_all_variables_to_pointer(
         epidata=new_epidata,
         metadata=g.metadata
     )
+
+def count_node_in_graph(g: penman.Graph):
+    nodes = set([g.top])
+    for source, role, target in g.triples:
+        if role == ":instance":
+            continue
+
+        nodes.add(source)
+        nodes.add(target)
+
+    return len(nodes)
+
+def count_token_in_text(s: str):
+    return len("".join([(c if c.isalnum() else " ") for c in s]).strip().split())
