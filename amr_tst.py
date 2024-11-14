@@ -1,7 +1,7 @@
 import penman
 from amr_to_text import AMRToTextBase
 from dataclasses import dataclass
-from style_detector import StyleDetector
+from style_detector import StyleDetectorBase
 from style_rewriting import StyleRewriting
 from text_to_amr import TextToAMR
 from utils import make_no_metadata_graph
@@ -60,7 +60,7 @@ class AMRTST:
     def __init__(
             self,
             t2a: TextToAMR,
-            sd: StyleDetector,
+            sd: StyleDetectorBase,
             sr: StyleRewriting,
             a2t: AMRToTextBase
     ):

@@ -4,8 +4,26 @@ sys.path.append("./indonesian-aste-generative")
 from demo import load_generator
 import stanza
 import string
+import torch
+from transformers import RobertaPreTrainedModel, RobertaTokenizer
 
-class StyleDetector:
+class StyleDetectorBase:
+    """
+    Base class for any style detector class
+    """
+
+    def __call__(self, text: str, verbose: bool = False) -> list[str]:
+        """
+        Detect style words from `text`.
+
+        Args:
+        - `text`: Text input.
+
+        - `verbose`: If it's True, print additional informations in the process.
+        """
+        raise NotImplementedError
+
+class StyleDetector(StyleDetectorBase):
     """
     Class for style detector implementation. The detection uses [William's opinion triplet extraction](https://github.com/William9923/indonesian-aste-generative/tree/master).
     """
@@ -129,3 +147,218 @@ class StyleDetector:
 
         preprocessed_text = " ".join(preprocessed_text.strip().split())
         return preprocessed_text
+
+class StyleDetectorWithAttention(StyleDetectorBase):
+    """
+    Class for style detector implementation with attention, related to Shi et al.'s (2023) method.
+    """
+
+    def __init__(
+            self,
+            model: RobertaPreTrainedModel,
+            tokenizer: RobertaTokenizer,
+            layer_index: int,
+            head_index: int,
+            threshold: float = 0.25,
+            word_method: str = "sum",
+    ):
+        """
+        Initialize `StyleDetector` class.
+
+        Args:
+        - `model`: RoBERTa model.
+
+        - `tokenizer`: RoBERTa tokenizer.
+
+        - `layer_index`: Chosen layer index (starts from 0).
+
+        - `head_index`: Chosen head index (starts from 0).
+
+        - `threshold`: How many proportion of style words should be chosen for a sentence?
+
+        - `word_method`: `sum` (default) or `max`. How the attention was calculated for a word in many tokens?
+        """
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+        model.eval()
+
+        self.tokenizer = tokenizer
+        self.model = model
+        self.device = device
+        self.layer_index = layer_index
+        self.head_index = head_index
+        self.threshold = threshold
+        self.word_method = word_method
+        
+    def __call__(self, text: str, verbose: bool = False) -> list[str]:
+        """
+        Detect style words from `text`.
+
+        Args:
+        - `text`: Text input.
+
+        - `verbose`: If it's True, print additional informations in the process.
+        """
+        preped_text = self._preprocess_text(text)
+        if verbose:
+            print(f"preped_text ({type(preped_text)}):")
+            print(preped_text)
+
+        att, decoding_ids = self._get_attention(preped_text)
+        if verbose:
+            print(f"\natt ({type(att)}):")
+            print(att)
+            print(f"\ndecoding_ids ({type(decoding_ids)}):")
+            print(decoding_ids)
+
+        indices = self._get_filtered_indices(att, decoding_ids)
+        if verbose:
+            print(f"\nindices ({type(indices)}):")
+            print(indices)
+
+        style_words = self._get_filtered_words_by_indices(preped_text, indices)
+        return style_words
+
+    def _preprocess_text(self, text: str):
+        lowercased_text = text.lower()
+        preprocessed_text = ""
+        current_is_not_a_letter_or_digit = False
+        for c in lowercased_text:
+            if c in string.ascii_lowercase or c in string.digits:
+                if current_is_not_a_letter_or_digit:
+                    preprocessed_text += " "
+                current_is_not_a_letter_or_digit = False
+            else:
+                preprocessed_text += " "
+                current_is_not_a_letter_or_digit = True
+
+            preprocessed_text += c
+
+        preprocessed_text = " ".join(preprocessed_text.strip().split())
+        return preprocessed_text
+    
+    def _get_attention(self, text: str):
+        """
+        This function calculates attention weights of all the heads and
+        returns it along with the encoded sentence for further processing.
+
+        text: Text input.
+        """
+
+        tokenizer = self.tokenizer # <- Need to implement this one.
+        model = self.model
+        device = self.device
+
+        ## Preprocessing for RoBERTa Indo
+        text_tokens = tokenizer.tokenize(text)
+        tokens = ["<s>"] + text_tokens + ["</s>"]
+        temp_ids = tokenizer.convert_tokens_to_ids(tokens)
+
+        input_mask = [1] * len(temp_ids)
+        segment_id = [0] * len(temp_ids)
+
+        ## Convert the list of int ids to Torch Tensors
+        ids = torch.tensor([temp_ids])
+        segment_ids = torch.tensor([segment_id])
+        input_masks = torch.tensor([input_mask])
+
+        ids = ids.to(device)
+        segment_ids = segment_ids.to(device)
+        input_masks = input_masks.to(device)
+
+        with torch.no_grad():
+            model_result = model(ids, input_masks, segment_ids, output_attentions=True)
+            attn = model_result.attentions[self.layer_index]
+
+        attn = attn.to('cpu')
+        attn = attn[0]
+        attn = attn[self.head_index]
+
+        '''
+        attention weights are stored in this way:
+        att_lt['length_of_sentence']
+        '''
+        return attn, ids[0]
+    
+    def _get_filtered_indices(self, att, decoding_ids):
+        """
+        This function processes attentions by only taking the top indices with defined threshold value.
+
+        att: attention
+        decoding_ids: indexed sentence
+        threshold: Percentage of the top indexes to be removed
+        word_method: How the attention was chosen for one word in many tokens
+        """
+        # List of None of num_of_layers * num_of_heads to save the results of each head for input_sentences
+
+        tokenizer = self.tokenizer
+        threshold = self.threshold
+        word_method = self.word_method
+
+        tok_idx = 1 # Ignore <s>
+        token = tokenizer.convert_ids_to_tokens(decoding_ids[tok_idx].item())
+        word_att = [att[0][tok_idx]]
+        boundary = []
+
+        stop_tok_idx = len(decoding_ids)
+        stop = False
+        while not stop:
+            tok_idx += 1
+            if tok_idx == stop_tok_idx:
+                print("Warning: end without </s>. This can be lead to error.")
+                stop = True
+            else:
+                token = tokenizer.convert_ids_to_tokens(decoding_ids[tok_idx].item())
+                if token == "</s>":
+                    stop = True
+                elif token.startswith("Ġ"): # Because it just a space separator word.
+                    word_att.append(att[0][tok_idx])
+                    boundary.append(tok_idx)
+                else:
+                    if word_method == "sum":
+                        word_att[-1] += att[0][tok_idx]
+                    elif word_method == "max":
+                        word_att[-1] = max(att[0][tok_idx], word_att[-1])
+                    else:
+                        raise ValueError(f"Unexpected word method: {word_method}")
+
+        boundary.append(tok_idx)
+
+        _, word_topi = torch.Tensor(word_att).topk(len(word_att))
+        word_index_list = list(word_topi)
+        # Sometimes the taken attention isn't even a word, so we need to blacklist it.
+
+        word_count = 0
+        while word_count < len(word_index_list):
+            word_idx = word_index_list[word_count]
+            start_tok_idx = 1 if word_idx == 0 else boundary[word_idx - 1]
+            end_tok_idx = boundary[word_idx]
+
+            found = False
+            for tok_idx in range(start_tok_idx, end_tok_idx):
+                token = tokenizer.convert_ids_to_tokens(decoding_ids[tok_idx].item())
+                if any(c in token for c in "abcdefghijklmnopqrstuvwxyz"):
+                    found = True
+                    break
+
+            if found:
+                word_count += 1
+            else:
+                word_index_list.pop(word_count)
+
+        # word_index_list may be modified, word_count == len(word_index_list)
+        word_count = 0
+        while word_count < len(word_index_list) * threshold:
+            word_count += 1
+
+        # word_count >= len(word_index_list) * threshold
+        word_topi = [x.item() for x in word_index_list[:word_count]]
+        word_topi.sort()
+        processed_indices = word_topi
+
+        return processed_indices
+    
+    def _get_filtered_words_by_indices(self, text: str, indices: list[int]):
+        words = text.split(" ")
+        filtered_words = [w for j, w in enumerate(words) if j in indices]
+        return filtered_words
