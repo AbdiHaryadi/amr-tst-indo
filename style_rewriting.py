@@ -25,7 +25,8 @@ class StyleRewriting:
             max_score_strategy: bool = False,
             remove_polarity_strategy: bool = True,
             reset_sense_strategy: bool = True,
-            use_stem: bool = True
+            use_stem: bool = True,
+            position_aware_concatenation: bool = False,
     ):
         """
         Initialize `StyleRewriting` class.
@@ -61,6 +62,10 @@ class StyleRewriting:
 
         - `use_stem`: Default to `True`. If it's `True`, a word and an instance
         need to be stemmed before checking the exact match consistency.
+
+        - `position_aware_concatenation`: Default to `False`. If it's `True`, instead
+        of doing naive concatenation, the chosen antonym should be replaced depend on the
+        style word positions.
         """
 
         self._load_clf_pipeline(clf_pipeline)
@@ -76,6 +81,7 @@ class StyleRewriting:
             self.stemmer = StemmerFactory().create_stemmer()
         else:
             self.stemmer = None
+        self.position_aware_concatenation = position_aware_concatenation
 
         self.last_log: list[dict[str]] = []
 
@@ -119,8 +125,6 @@ class StyleRewriting:
 
         self.last_log = []
 
-        text_without_style_words = self._get_text_without_style_words(text, style_words)
-
         new_amr = amr
         handled_style_words = []
 
@@ -132,7 +136,7 @@ class StyleRewriting:
                 new_amr = self._remove_polarity(new_amr, w)
             
             elif self._is_word_consistent_with_node_in_amr(new_amr, w):
-                target_w = self._get_target_style_word(source_style, w, text_without_style_words, verbose)
+                target_w = self._get_target_style_word(text, style_words, source_style, w, verbose)
                 if target_w is None:
                     if self.ignore_and_warn_if_target_word_not_found:
                         print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
@@ -178,7 +182,14 @@ class StyleRewriting:
 
         return antonym_list
 
-    def _get_target_style_word(self, source_style: str, style_word: str, text_without_style_words: str, verbose: bool):
+    def _get_target_style_word(
+            self,
+            text: str,
+            detected_style_words: list[str],
+            source_style: str,
+            style_word: str,
+            verbose: bool
+        ):
         tried_style_word_set = set()
         style_word_list = [style_word]
         while len(style_word_list) > 0:
@@ -209,7 +220,12 @@ class StyleRewriting:
             max_score = 0.0
             chosen_a = None
             for a in antonym_list:
-                x_tmp = text_without_style_words + " " + a
+                x_tmp = self._make_sentence_with_single_antonym(
+                    text,
+                    detected_style_words,
+                    style_word,
+                    a
+                )
                 try:
                     pipe_result, *_ = self.clf_pipe(x_tmp)
                     if verbose:
@@ -263,6 +279,36 @@ class StyleRewriting:
             style_word_list = new_style_word_list
 
         return None
+
+    def _make_sentence_with_single_antonym(
+            self,
+            text: str,
+            detected_style_words: list[str],
+            style_word: str,
+            antonym: str
+    ):
+        if self.position_aware_concatenation:
+            ss_tokens = text.split(" ")
+            new_ss_tokens = []
+
+            for t in ss_tokens:
+                new_t = t
+                for w in detected_style_words:
+                    if w == style_word:
+                        new_t = new_t.replace(w, antonym)
+                    else:
+                        new_t = new_t.replace(w, "")
+                
+                new_t = new_t.strip()
+                if new_t != "":
+                    new_ss_tokens.append(new_t)
+
+            return " ".join(new_ss_tokens)
+            
+        else:
+            text_without_style_words = self._get_text_without_style_words(text, detected_style_words)
+            x_tmp = text_without_style_words + " " + antonym
+            return x_tmp
 
     def _get_text_without_style_words(self, text: str, style_words: list[str]):
         ss_tokens = text.split(" ")
