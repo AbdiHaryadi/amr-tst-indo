@@ -27,6 +27,7 @@ class StyleRewriting:
             reset_sense_strategy: bool = True,
             use_stem: bool = True,
             position_aware_concatenation: bool = False,
+            maximize_style_words_expansion: bool = True,
     ):
         """
         Initialize `StyleRewriting` class.
@@ -66,6 +67,10 @@ class StyleRewriting:
         - `position_aware_concatenation`: Default to `False`. If it's `True`, instead
         of doing naive concatenation, the chosen antonym should be replaced depend on the
         style word positions.
+
+        - `maximize_style_words_expansion`: Default to `True`. If it's `False`, after
+        finding some antonyms, no expansion is needed, and returning no style words is more
+        probable.
         """
 
         self._load_clf_pipeline(clf_pipeline)
@@ -82,6 +87,7 @@ class StyleRewriting:
         else:
             self.stemmer = None
         self.position_aware_concatenation = position_aware_concatenation
+        self.maximize_style_words_expansion = maximize_style_words_expansion
 
         self.last_log: list[dict[str]] = []
 
@@ -136,7 +142,11 @@ class StyleRewriting:
                 new_amr = self._remove_polarity(new_amr, w)
             
             elif self._is_word_consistent_with_node_in_amr(new_amr, w):
-                target_w = self._get_target_style_word(text, style_words, source_style, w, verbose)
+                if self.maximize_style_words_expansion:
+                    target_w = self._get_target_style_word(text, style_words, source_style, w, verbose)
+                else:
+                    target_w = self._get_target_style_word_v2(text, style_words, source_style, w, verbose)
+
                 if target_w is None:
                     if self.ignore_and_warn_if_target_word_not_found:
                         print(f"Warning: For text \"{text}\", target word for \"{w}\" is not found with source style {source_style}. Ignored.")
@@ -193,92 +203,175 @@ class StyleRewriting:
         tried_style_word_set = set()
         style_word_list = [style_word]
         while len(style_word_list) > 0:
-            antonym_list = []
-
-            for current_style_word in style_word_list:
-                current_antonym_list = self._get_antonym_list(current_style_word)
-                if verbose:
-                    print(f"{current_style_word=}")
-                    print(f"{current_antonym_list=}")
-
-                self.last_log.append({
-                    "type": "get_antonyms",
-                    "word": current_style_word,
-                    "antonyms": current_antonym_list
-                })
-
-                for a in current_antonym_list:
-                    if a not in antonym_list:
-                        antonym_list.append(a)
-
-                tried_style_word_set.add(current_style_word)
-
-            if verbose:
-                print(f"{style_word_list=}")
-                print(f"{antonym_list=}")
-                
-            max_score = 0.0
-            chosen_a = None
-            for a in antonym_list:
-                x_tmp = self._make_sentence_with_single_antonym(
-                    text,
-                    detected_style_words,
-                    style_word,
-                    a
-                )
-                try:
-                    pipe_result, *_ = self.clf_pipe(x_tmp)
-                    if verbose:
-                        print(f"{x_tmp=}")
-                        print(f"{pipe_result=}")
-                    
-                    self.last_log.append({
-                        "type": "check_style",
-                        "text": x_tmp
-                    } | pipe_result)
-
-                    if pipe_result["label"] != source_style:
-                        if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
-                            chosen_a = a
-                            if not self.max_score_strategy:
-                                break
-
-                            max_score = pipe_result["score"]
-                    
-                except Exception as e:
-                    print(f"Error when processing \"{x_tmp}\"!\nError: {e}\nBecause of that, {a} is chosen as valid target style word.")
-                    chosen_a = a
-                    break
-
-            # All antonym_list element has been iterated
+            antonym_list = self._get_antonym_list_from_style_word_list(
+                style_word_list,
+                verbose
+            )
+            chosen_a = self._find_valid_antonym(
+                text,
+                detected_style_words,
+                source_style,
+                style_word,
+                antonym_list,
+                verbose
+            )
             if chosen_a is not None:
                 return chosen_a
             # else: expand the words
 
-            new_style_word_list = []
-            for current_style_word in style_word_list:
-                fasttext_result = self.fasttext_model.get_nearest_neighbors(current_style_word, k=self.word_expand_size)
-                if verbose:
-                    print(f"{current_style_word=}")
-                    print(f"{fasttext_result=}")
-
-                for _, new_style_word in fasttext_result:
-                    if new_style_word not in tried_style_word_set:
-                        new_style_word_list.append(new_style_word)
-
-            if verbose:
-                print(f"{tried_style_word_set=}")
-                print(f"{new_style_word_list=}")
-
-            self.last_log.append({
-                "type": "expand",
-                "old_words": style_word_list,
-                "new_words": new_style_word_list
-            })
-
+            new_style_word_list = self._expand_style_word_list(
+                style_word_list,
+                tried_style_word_set,
+                verbose
+            )
             style_word_list = new_style_word_list
 
         return None
+    
+    def _get_target_style_word_v2(
+            self,
+            text: str,
+            detected_style_words: list[str],
+            source_style: str,
+            style_word: str,
+            verbose: bool
+        ):
+        tried_style_word_set = set()
+        style_word_list = [style_word]
+
+        antonym_list = []
+        while len(antonym_list) == 0 and len(style_word_list) > 0:
+            antonym_list = self._get_antonym_list_from_style_word_list(
+                style_word_list,
+                verbose
+            )
+            
+            if len(antonym_list) == 0:
+                new_style_word_list = self._expand_style_word_list(
+                    style_word_list,
+                    tried_style_word_set,
+                    verbose
+                )
+                style_word_list = new_style_word_list
+
+        # len(antonym_list) > 0 or len(style_word_list) == 0
+        if len(antonym_list) == 0:
+            return None
+        
+        chosen_a = self._find_valid_antonym(
+            text,
+            detected_style_words,
+            source_style,
+            style_word,
+            antonym_list,
+            verbose
+        )
+        return chosen_a
+
+    def _get_antonym_list_from_style_word_list(
+            self,
+            style_word_list: list[str],
+            verbose: bool
+    ):
+        antonym_list: list[str] = []
+        for current_style_word in style_word_list:
+            current_antonym_list = self._get_antonym_list(current_style_word)
+            if verbose:
+                print(f"{current_style_word=}")
+                print(f"{current_antonym_list=}")
+
+            self.last_log.append({
+                "type": "get_antonyms",
+                "word": current_style_word,
+                "antonyms": current_antonym_list
+            })
+
+            for a in current_antonym_list:
+                if a not in antonym_list:
+                    antonym_list.append(a)
+
+        if verbose:
+            print(f"{style_word_list=}")
+            print(f"{antonym_list=}")
+        
+        return antonym_list
+
+    def _expand_style_word_list(
+            self,
+            style_word_list: list[str],
+            tried_style_word_set: set[str],
+            verbose: bool
+    ):
+        for current_style_word in style_word_list:
+            tried_style_word_set.add(current_style_word)
+
+        new_style_word_list: list[str] = []
+        for current_style_word in style_word_list:
+            fasttext_result = self.fasttext_model.get_nearest_neighbors(current_style_word, k=self.word_expand_size)
+            if verbose:
+                print(f"{current_style_word=}")
+                print(f"{fasttext_result=}")
+
+            for _, new_style_word in fasttext_result:
+                if new_style_word not in tried_style_word_set:
+                    new_style_word_list.append(new_style_word)
+
+        if verbose:
+            print(f"{style_word_list=}")
+            print(f"{new_style_word_list=}")
+
+        self.last_log.append({
+            "type": "expand",
+            "old_words": style_word_list,
+            "new_words": new_style_word_list
+        })
+        
+        return new_style_word_list
+
+    def _find_valid_antonym(
+            self,
+            text: str,
+            detected_style_words: list[str],
+            source_style: str,
+            style_word: str,
+            antonym_list: list[str],
+            verbose: bool
+    ):
+        max_score = 0.0
+        chosen_a = None
+        for a in antonym_list:
+            x_tmp = self._make_sentence_with_single_antonym(
+                text,
+                detected_style_words,
+                style_word,
+                a
+            )
+            try:
+                pipe_result, *_ = self.clf_pipe(x_tmp)
+                if verbose:
+                    print(f"{x_tmp=}")
+                    print(f"{pipe_result=}")
+                
+                self.last_log.append({
+                    "type": "check_style",
+                    "text": x_tmp
+                } | pipe_result)
+
+                if pipe_result["label"] != source_style:
+                    if (not self.max_score_strategy) or (max_score < pipe_result["score"]):
+                        chosen_a = a
+                        if not self.max_score_strategy:
+                            break
+
+                        max_score = pipe_result["score"]
+                
+            except Exception as e:
+                print(f"Error when processing \"{x_tmp}\"!\nError: {e}\nBecause of that, {a} is chosen as valid target style word.")
+                chosen_a = a
+                break
+        
+        # All antonym_list element has been iterated
+        return chosen_a
 
     def _make_sentence_with_single_antonym(
             self,
