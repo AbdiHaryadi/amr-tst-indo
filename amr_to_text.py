@@ -1,7 +1,8 @@
+import os
 import sys
 
 from utils import make_no_metadata_graph, to_amr_with_pointer
-sys.path.append("./AMRBART-id/fine-tune")
+sys.path.append(os.path.join(os.path.dirname(__file__), "AMRBART-id/fine-tune"))
 
 from common.options import DataTrainingArguments, ModelArguments, Seq2SeqTrainingArguments
 from data_interface.dataset import AMR2TextDataSet, DataCollatorForAMR2Text
@@ -10,7 +11,6 @@ from datasets import load_from_disk
 import json
 import logging
 from model_interface.tokenization_bart import AMRBartTokenizer
-import os
 import penman
 from seq2seq_trainer import Seq2SeqTrainer
 import torch

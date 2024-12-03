@@ -1,5 +1,6 @@
+import os
 import sys
-sys.path.append("./indonesian-aste-generative")
+sys.path.append(os.path.join(os.path.dirname(__file__), "indonesian-aste-generative"))
 
 from demo import load_generator
 import stanza
