@@ -63,11 +63,7 @@ class StyleDetector(StyleDetectorBase):
 
         - `triplets_callback`: If it's not None, this callback will be called and includes involved triplets during the pass.
         """
-        preprocessed_text = self._preprocess_text(text)
-        if verbose:
-            print("Preprocessed text result:", preprocessed_text)
-
-        data = self.generator(preprocessed_text)
+        data = self.get_triplets(text, verbose)
         if triplets_callback is not None:
             triplets_callback(data)
 
@@ -75,6 +71,27 @@ class StyleDetector(StyleDetectorBase):
             for x in data:
                 print("Triplet:", x)
         
+        results: list[str] = self.get_style_words_from_triplets(data, verbose)
+        return results
+
+    def get_triplets(
+            self,
+            text: str,
+            verbose: bool = False
+    ):
+        preprocessed_text = self._preprocess_text(text)
+        if verbose:
+            print("Preprocessed text result:", preprocessed_text)
+
+        data = self.generator(preprocessed_text)
+        return data
+    
+    def get_style_words_from_triplets(
+            self,
+            triplets: list,
+            verbose: bool = False
+    ):
+        data = triplets
         results: list[str] = []
         for _, opinion_terms, sentiment in data:
             if sentiment == "netral":
