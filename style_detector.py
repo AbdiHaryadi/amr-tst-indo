@@ -7,6 +7,7 @@ import stanza
 import string
 import torch
 from transformers import RobertaPreTrainedModel, RobertaTokenizer
+from typing import Callable
 
 class StyleDetectorBase:
     """
@@ -46,7 +47,12 @@ class StyleDetector(StyleDetectorBase):
         stanza.download(lang=lang)
         self.nlp = stanza.Pipeline(lang=lang, processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True)
 
-    def __call__(self, text: str, verbose: bool = False) -> list[str]:
+    def __call__(
+            self,
+            text: str,
+            verbose: bool = False,
+            triplets_callback: Callable[[list], None] | None = None 
+    ) -> list[str]:
         """
         Detect style words from `text`.
 
@@ -54,12 +60,17 @@ class StyleDetector(StyleDetectorBase):
         - `text`: Text input.
 
         - `verbose`: If it's True, print additional informations in the process.
+
+        - `triplets_callback`: If it's not None, this callback will be called and includes involved triplets during the pass.
         """
         preprocessed_text = self._preprocess_text(text)
         if verbose:
             print("Preprocessed text result:", preprocessed_text)
 
         data = self.generator(preprocessed_text)
+        if triplets_callback is not None:
+            triplets_callback(data)
+
         if verbose:
             for x in data:
                 print("Triplet:", x)
